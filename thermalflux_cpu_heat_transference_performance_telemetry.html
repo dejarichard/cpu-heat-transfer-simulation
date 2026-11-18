@@ -1,0 +1,2492 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>THERMALFLUX // CPU Heat Transference & Performance Telemetry</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            obsidian: '#080a0f',
+            panel: '#0e131f',
+            cyanAccent: '#38bdf8',
+            emeraldAccent: '#10b981',
+            amberAccent: '#f59e0b',
+            crimsonAccent: '#ef4444',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Base Obsidian Engineering Aesthetic */
+    :root {
+      --bg-obsidian: #080a0f;
+      --glass-bg: rgba(14, 19, 31, 0.74);
+      --glass-border: rgba(56, 189, 248, 0.16);
+      --glass-highlight: rgba(255, 255, 255, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-obsidian);
+      background-image:
+        radial-gradient(circle at 15% 10%, rgba(56, 189, 248, 0.07) 0%, transparent 38%),
+        radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
+        linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+      color: #e2e8f0;
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Glassmorphism Cards */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        0 10px 30px -10px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 0 var(--glass-highlight);
+      border-radius: 1rem;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .glass-card:hover {
+      border-color: rgba(56, 189, 248, 0.28);
+    }
+
+    .glass-subcard {
+      background: rgba(8, 11, 18, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 0.75rem;
+    }
+
+    /* Custom Precision Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(30, 41, 59, 0.9);
+      border-radius: 999px;
+      outline: none;
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #080a0f;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+      cursor: pointer;
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #7dd3fc;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #080a0f;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* Custom Select Dropdowns */
+    select.telemetry-select {
+      background-color: rgba(8, 11, 18, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      color: #f1f5f9;
+      border-radius: 0.65rem;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.8125rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+
+    select.telemetry-select:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    /* Toggle Switch */
+    .toggle-checkbox:checked {
+      right: 0;
+      border-color: #10b981;
+    }
+    .toggle-checkbox:checked + .toggle-label {
+      background-color: rgba(16, 185, 129, 0.35);
+      border-color: rgba(16, 185, 129, 0.7);
+    }
+
+    /* Subtle Pulse Indicator */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.92); }
+    }
+    .status-dot {
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080a0f;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-sky-500/30 selection:text-sky-200">
+
+  <!-- Top Engineering Header -->
+  <header class="sticky top-0 z-40 border-b border-sky-500/15 bg-[#080a0f]/85 backdrop-blur-xl">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Identity -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-emerald-500/20 border border-sky-400/30 flex items-center justify-center shadow-lg shadow-sky-500/10">
+          <svg class="w-5 h-5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <rect x="9" y="9" width="6" height="6" />
+            <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-mono font-bold tracking-wider text-sm sm:text-base text-slate-100">
+              THERMAL<span class="text-sky-400">FLUX</span>
+            </h1>
+            <span class="hidden md:inline-block text-[11px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/25">
+              v2.4 THERMODYNAMIC TELEMETRY
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">CPU Heat Transference Physics &amp; Performance Optimization Suite</p>
+        </div>
+      </div>
+
+      <!-- Live Hardware & Sandbox Badges -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+        <!-- Logical Cores Badge -->
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full bg-sky-400 status-dot"></span>
+          <span class="text-slate-400">CORES:</span>
+          <span id="headerCoreCount" class="text-slate-100 font-semibold">--</span>
+        </div>
+
+        <!-- Compute Pressure API Status -->
+        <div id="pressureBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-xs font-mono">
+          <span id="pressureDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="text-slate-400">PRESSURE:</span>
+          <span id="pressureStateText" class="text-emerald-400 font-semibold">INITIALIZING</span>
+        </div>
+
+        <!-- Sandbox Architecture Info Trigger -->
+        <button id="openSandboxModalBtn" type="button"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-medium transition cursor-pointer">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <span>Browser Sandbox Info</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Container -->
+  <main class="max-w-[1600px] mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+    <!-- ROW 1: Primary Telemetry KPI Strip -->
+    <section aria-label="Primary Thermal Telemetry Readouts" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+      <!-- KPI 1: Junction Temperature (Tj) -->
+      <div class="glass-card p-4 relative overflow-hidden">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400">Junction Temp (T<sub>j</sub>)</span>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span id="kpiTj" class="font-mono text-3xl font-bold text-emerald-400 tabular-nums">38.4</span>
+              <span class="font-mono text-sm text-slate-400">°C</span>
+              <span id="kpiThermalStatus" class="ml-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                OPTIMAL
+              </span>
+            </div>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-900/80 border border-slate-700/50 text-sky-400">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+            </svg>
+          </div>
+        </div>
+        <!-- Headroom Bar -->
+        <div class="mt-3">
+          <div class="flex justify-between text-[11px] font-mono text-slate-400 mb-1">
+            <span>TJMax Headroom (100°C)</span>
+            <span id="kpiHeadroom" class="text-slate-200 font-semibold">+61.6 °C</span>
+          </div>
+          <div class="w-full h-2 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
+            <div id="kpiTjBar" class="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-red-500 transition-all duration-200" style="width: 38.4%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 2: Package Power & Core Voltage -->
+      <div class="glass-card p-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400">Package Power (P<sub>total</sub>)</span>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span id="kpiPower" class="font-mono text-3xl font-bold text-sky-400 tabular-nums">42.0</span>
+              <span class="font-mono text-sm text-slate-400">W</span>
+              <span id="kpiPowerLimitPct" class="text-xs font-mono text-slate-400">/ 150W TDP</span>
+            </div>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-900/80 border border-slate-700/50 text-amber-400">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono">
+          <div>
+            <span class="text-slate-500 block text-[10px]">EST. VCORE</span>
+            <span id="kpiVcore" class="text-slate-200 font-semibold tabular-nums">1.185 V</span>
+          </div>
+          <div>
+            <span class="text-slate-500 block text-[10px]">DIE HEAT DENSITY</span>
+            <span id="kpiHeatDensity" class="text-amber-300 font-semibold tabular-nums">23.3 W/cm²</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 3: Thermal Resistance & Boundary Flux -->
+      <div class="glass-card p-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400">Total Resistance (R<sub>θ,tot</sub>)</span>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span id="kpiRtotal" class="font-mono text-3xl font-bold text-slate-100 tabular-nums">0.362</span>
+              <span class="font-mono text-sm text-slate-400">°C/W</span>
+            </div>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-900/80 border border-slate-700/50 text-emerald-400">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono">
+          <div>
+            <span class="text-slate-500 block text-[10px]">CONVECTIVE OUT (Q)</span>
+            <span id="kpiQconv" class="text-emerald-400 font-semibold tabular-nums">41.8 W</span>
+          </div>
+          <div>
+            <span class="text-slate-500 block text-[10px]">EXHAUST AIR (T<sub>out</sub>)</span>
+            <span id="kpiTout" class="text-sky-300 font-semibold tabular-nums">24.2 °C</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 4: Effective Clock Efficiency & Throttling -->
+      <div class="glass-card p-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400">Clock Efficiency</span>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span id="kpiClockEff" class="font-mono text-3xl font-bold text-emerald-400 tabular-nums">100.0</span>
+              <span class="font-mono text-sm text-slate-400">%</span>
+              <span id="kpiEstClock" class="text-xs font-mono text-sky-300">5.10 GHz</span>
+            </div>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-900/80 border border-slate-700/50 text-purple-400">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono">
+          <div>
+            <span class="text-slate-500 block text-[10px]">THROTTLE PENALTY</span>
+            <span id="kpiThrottlePenalty" class="text-emerald-400 font-semibold tabular-nums">0.0 %</span>
+          </div>
+          <div>
+            <span class="text-slate-500 block text-[10px]">LOOP JITTER</span>
+            <span id="kpiJitter" class="text-slate-200 font-semibold tabular-nums">0.2 ms</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROW 2: Main Engineering Workspace (12-Col Grid) -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+      <!-- LEFT COLUMN (4 Cols): Hardware Controls + Live Stress Engine -->
+      <div class="lg:col-span-4 space-y-5">
+
+        <!-- Panel A: Thermodynamic & Hardware Stack Controls -->
+        <div class="glass-card p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                Thermal &amp; Silicon Parameters
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">Configure power envelope, TIM &amp; cooling stack</p>
+            </div>
+            <!-- Quick Scenario Presets -->
+            <select id="presetSelector" aria-label="Load Hardware Preset" class="telemetry-select text-xs py-1 px-2">
+              <option value="custom">Presets...</option>
+              <option value="idle">Silent Desktop Idle</option>
+              <option value="gaming">1440p Gaming Load</option>
+              <option value="bottleneck_tim">Degraded Paste Bottleneck</option>
+              <option value="throttling_sff">220W SFF Thermal Throttle</option>
+              <option value="custom_loop">Tuned Undervolt + 360 AIO</option>
+            </select>
+          </div>
+
+          <!-- CPU Workload (%) -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <label for="workloadSlider" class="font-medium text-slate-300 flex items-center gap-1.5">
+                CPU Workload
+                <span id="workloadSyncTag" class="hidden text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  LIVE SYNC
+                </span>
+              </label>
+              <span id="workloadVal" class="font-mono font-semibold text-sky-400 tabular-nums">35%</span>
+            </div>
+            <input id="workloadSlider" type="range" min="0" max="100" value="35" />
+          </div>
+
+          <!-- Package Power Limit / TDP (W) -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <label for="tdpSlider" class="font-medium text-slate-300">Package Power Limit (PL1/TDP)</label>
+              <span id="tdpVal" class="font-mono font-semibold text-amber-400 tabular-nums">150 W</span>
+            </div>
+            <input id="tdpSlider" type="range" min="15" max="250" step="5" value="150" />
+          </div>
+
+          <!-- Core Voltage Offset (mV) -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <label for="vcoreSlider" class="font-medium text-slate-300">Core Voltage Offset (ΔV<sub>core</sub>)</label>
+              <span id="vcoreVal" class="font-mono font-semibold text-emerald-400 tabular-nums">0 mV</span>
+            </div>
+            <input id="vcoreSlider" type="range" min="-150" max="50" step="5" value="0" />
+            <div class="flex justify-between text-[10px] font-mono text-slate-500">
+              <span>-150mV Undervolt</span>
+              <span>Stock</span>
+              <span>+50mV OC</span>
+            </div>
+          </div>
+
+          <!-- Thermal Interface Material (TIM) Selector -->
+          <div class="space-y-1.5">
+            <label for="timSelect" class="block text-xs font-medium text-slate-300">
+              Thermal Interface Material (TIM)
+            </label>
+            <select id="timSelect" class="telemetry-select w-full">
+              <option value="standard">Standard Silicone Paste (8.5 W/m·K | 85μm)</option>
+              <option value="enthusiast" selected>Enthusiast Nano-Paste (12.5 W/m·K | 65μm)</option>
+              <option value="ptm7950">Phase-Change Pad PTM7950 (8.5 W/m·K | 35μm)</option>
+              <option value="liquid_metal">Gallium Liquid Metal (73.0 W/m·K | 30μm)</option>
+            </select>
+          </div>
+
+          <!-- Cooling Architecture Selector -->
+          <div class="space-y-1.5">
+            <label for="coolerSelect" class="block text-xs font-medium text-slate-300">
+              Cooling Architecture
+            </label>
+            <select id="coolerSelect" class="telemetry-select w-full">
+              <option value="low_profile">Low-Profile SFF Air Cooler (65W–110W)</option>
+              <option value="dual_tower" selected>Dual-Tower 6-Heatpipe Air (180W–220W)</option>
+              <option value="aio_240">240mm AIO Liquid Cooler (230W)</option>
+              <option value="custom_360">360mm High-Static AIO / Custom Loop (300W+)</option>
+            </select>
+          </div>
+
+          <!-- Fan / Pump Duty Cycle (%) & Ambient Temp (°C) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-center text-xs">
+                <label for="fanSlider" class="font-medium text-slate-300">Fan / Pump</label>
+                <span id="fanVal" class="font-mono font-semibold text-sky-300 tabular-nums">65%</span>
+              </div>
+              <input id="fanSlider" type="range" min="20" max="100" value="65" />
+            </div>
+
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-center text-xs">
+                <label for="ambientSlider" class="font-medium text-slate-300">Ambient T<sub>amb</sub></label>
+                <span id="ambientVal" class="font-mono font-semibold text-slate-200 tabular-nums">22 °C</span>
+              </div>
+              <input id="ambientSlider" type="range" min="18" max="40" value="22" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel B: Live Browser Telemetry & Multi-Core Stress Engine -->
+        <div class="glass-card p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 status-dot"></span>
+                Live Web Worker Stress &amp; Log Telemetry
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">Spawn real background threads or ingest sensor CSV</p>
+            </div>
+          </div>
+
+          <!-- Sync Telemetry Toggle -->
+          <div class="glass-subcard p-3 flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">Sync Telemetry to Thermal Model</div>
+              <div class="text-[11px] text-slate-400">Drives CPU workload from live workers + pressure</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input id="syncTelemetryToggle" type="checkbox" class="sr-only peer" />
+              <div class="w-11 h-6 bg-slate-800 border border-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500/40 peer-checked:border-emerald-400"></div>
+            </label>
+          </div>
+
+          <!-- Worker Thread Count & Stress Intensity -->
+          <div class="space-y-3">
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-center text-xs">
+                <label for="workerThreadsSlider" class="font-medium text-slate-300">Active Web Worker Threads</label>
+                <span id="workerThreadsVal" class="font-mono font-semibold text-sky-400 tabular-nums">4 / 8 Threads</span>
+              </div>
+              <input id="workerThreadsSlider" type="range" min="1" max="16" value="4" />
+            </div>
+
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-center text-xs">
+                <label for="stressIntensitySlider" class="font-medium text-slate-300">Math ALU Stress Duty Cycle</label>
+                <span id="stressIntensityVal" class="font-mono font-semibold text-rose-400 tabular-nums">0% (Idle)</span>
+              </div>
+              <input id="stressIntensitySlider" type="range" min="0" max="100" step="5" value="0" />
+            </div>
+
+            <!-- Live Stress Quick Buttons -->
+            <div class="grid grid-cols-3 gap-2 pt-1">
+              <button id="stressStopBtn" type="button"
+                class="py-1.5 px-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-slate-300 transition cursor-pointer">
+                0% STOP
+              </button>
+              <button id="stressBurstBtn" type="button"
+                class="py-1.5 px-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-xs font-mono text-amber-300 transition cursor-pointer">
+                50% BURST
+              </button>
+              <button id="stressMaxBtn" type="button"
+                class="py-1.5 px-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 border border-red-500/35 text-xs font-mono text-red-300 transition cursor-pointer">
+                100% STRESS
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Host Metrics Strip -->
+          <div class="grid grid-cols-3 gap-2 pt-1 text-center font-mono">
+            <div class="glass-subcard p-2">
+              <div class="text-[10px] text-slate-500">EFF. LOAD</div>
+              <div id="liveEffectiveLoad" class="text-xs font-semibold text-sky-300 mt-0.5 tabular-nums">0.0%</div>
+            </div>
+            <div class="glass-subcard p-2">
+              <div class="text-[10px] text-slate-500">EVENT JITTER</div>
+              <div id="liveJitterStat" class="text-xs font-semibold text-emerald-400 mt-0.5 tabular-nums">0.2 ms</div>
+            </div>
+            <div class="glass-subcard p-2">
+              <div class="text-[10px] text-slate-500">WORKER OPS</div>
+              <div id="liveWorkerOps" class="text-xs font-semibold text-slate-200 mt-0.5 tabular-nums">0.0 M/s</div>
+            </div>
+          </div>
+
+          <!-- CSV / JSON Sensor Log Importer -->
+          <div class="pt-2 border-t border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-300">HWiNFO64 / CoreTemp Log Importer</span>
+              <button id="loadSampleCsvBtn" type="button"
+                class="text-[11px] font-mono text-sky-400 hover:text-sky-300 underline underline-offset-2 cursor-pointer">
+                Load Sample Trace
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label for="sensorFileInput"
+                class="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-dashed border-sky-500/35 text-xs text-slate-300 cursor-pointer transition">
+                <svg class="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span id="fileInputLabel">Import .CSV or .JSON Sensor Log</span>
+              </label>
+              <input id="sensorFileInput" type="file" accept=".csv,.json,.txt" class="hidden" />
+            </div>
+
+            <!-- Active Log Playback Status Bar (visible when a log is loaded) -->
+            <div id="logPlaybackBar" class="hidden glass-subcard p-2.5 flex items-center justify-between text-xs font-mono">
+              <div class="flex items-center gap-2 truncate">
+                <span class="w-2 h-2 rounded-full bg-amber-400 status-dot shrink-0"></span>
+                <span id="logFileName" class="text-amber-300 truncate">hwinfo_trace.csv</span>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span id="logProgressText" class="text-slate-400">1/30</span>
+                <button id="stopLogPlaybackBtn" type="button" class="text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded bg-red-500/10 cursor-pointer">
+                  Stop
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN (8 Cols): Animated Heat Transference Stack + 60s Rolling Chart -->
+      <div class="lg:col-span-8 space-y-5">
+
+        <!-- Panel C: Animated SVG Thermal Stack Cross-Section Schematic -->
+        <div class="glass-card p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 mb-4">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                Conductive &amp; Convective Heat Transference Schematic
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">Real-time thermal resistance ladder (R<sub>θ</sub>), temperature gradients (ΔT), and heat flux (Q)</p>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] font-mono">
+              <span class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/70 text-slate-300">
+                R<sub>θ,tot</sub> = <span id="schematicRtot" class="text-sky-400 font-semibold">0.362 °C/W</span>
+              </span>
+              <span class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/70 text-slate-300">
+                ΔT<sub>j-amb</sub> = <span id="schematicDeltaT" class="text-amber-400 font-semibold">+16.4 °C</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Interactive SVG Schematic + Layer Telemetry Grid -->
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-center">
+            <!-- SVG Cross-Section Canvas -->
+            <div class="xl:col-span-8 bg-[#070a10] rounded-xl border border-slate-800/90 p-3 relative overflow-hidden">
+              <svg id="thermalStackSvg" viewBox="0 0 640 340" class="w-full h-auto block select-none" role="img" aria-label="CPU Thermal Stack Cross Section">
+                <defs>
+                  <!-- Dynamic Gradients updated by JS -->
+                  <linearGradient id="gradAirflow" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.22" />
+                    <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.04" />
+                  </linearGradient>
+                  <linearGradient id="gradHeatsink" x1="0" y1="1" x2="0" y2="0">
+                    <stop id="stopSinkBottom" offset="0%" stop-color="#38bdf8" stop-opacity="0.45" />
+                    <stop id="stopSinkTop" offset="100%" stop-color="#0284c7" stop-opacity="0.22" />
+                  </linearGradient>
+                  <linearGradient id="gradIhs" x1="0" y1="1" x2="0" y2="0">
+                    <stop id="stopIhsBottom" offset="0%" stop-color="#f59e0b" stop-opacity="0.55" />
+                    <stop id="stopIhsTop" offset="100%" stop-color="#38bdf8" stop-opacity="0.45" />
+                  </linearGradient>
+                  <linearGradient id="gradTim" x1="0" y1="0" x2="1" y2="0">
+                    <stop id="stopTimLeft" offset="0%" stop-color="#a855f7" stop-opacity="0.75" />
+                    <stop id="stopTimRight" offset="100%" stop-color="#ec4899" stop-opacity="0.75" />
+                  </linearGradient>
+                  <linearGradient id="gradDie" x1="0" y1="1" x2="0" y2="0">
+                    <stop id="stopDieBottom" offset="0%" stop-color="#10b981" stop-opacity="0.85" />
+                    <stop id="stopDieTop" offset="100%" stop-color="#34d399" stop-opacity="0.65" />
+                  </linearGradient>
+                  <filter id="glowSoft" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+
+                <!-- Subtle Blueprint Grid Lines -->
+                <g stroke="rgba(148,163,184,0.06)" stroke-width="1">
+                  <line x1="20" y1="68" x2="620" y2="68" stroke-dasharray="4 4" />
+                  <line x1="20" y1="138" x2="620" y2="138" stroke-dasharray="4 4" />
+                  <line x1="20" y1="194" x2="620" y2="194" stroke-dasharray="4 4" />
+                  <line x1="20" y1="220" x2="620" y2="220" stroke-dasharray="4 4" />
+                  <line x1="20" y1="276" x2="620" y2="276" stroke-dasharray="4 4" />
+                </g>
+
+                <!-- LAYER 5: Convective Airflow Zone (Top: y=14..68) -->
+                <g class="layer-group cursor-pointer" data-layer="convection">
+                  <rect x="70" y="14" width="350" height="52" rx="8" fill="url(#gradAirflow)" stroke="rgba(56,189,248,0.28)" stroke-width="1" />
+                  <!-- Animated Airflow Streamlines -->
+                  <path d="M90 30 Q 170 22, 250 30 T 400 30" fill="none" stroke="rgba(56,189,248,0.35)" stroke-width="1.5" stroke-dasharray="8 6" />
+                  <path d="M90 48 Q 170 40, 250 48 T 400 48" fill="none" stroke="rgba(56,189,248,0.25)" stroke-width="1.5" stroke-dasharray="6 8" />
+                  <text x="84" y="34" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11" font-weight="600">5. CONVECTIVE AIRFLOW / RADIATOR</text>
+                  <text id="svgAirSub" x="84" y="51" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">h(RPM) Convection | Exhaust: 24.2°C</text>
+                </g>
+
+                <!-- LAYER 4: Heatsink Fin Array & Coldplate (y=72..136) -->
+                <g class="layer-group cursor-pointer" data-layer="heatsink">
+                  <!-- Fin Vertical Blades -->
+                  <g id="svgFinArray" fill="url(#gradHeatsink)" stroke="rgba(56,189,248,0.45)" stroke-width="1">
+                    <rect x="82" y="72" width="14" height="46" rx="2" />
+                    <rect x="108" y="72" width="14" height="46" rx="2" />
+                    <rect x="134" y="72" width="14" height="46" rx="2" />
+                    <rect x="160" y="72" width="14" height="46" rx="2" />
+                    <rect x="186" y="72" width="14" height="46" rx="2" />
+                    <rect x="212" y="72" width="14" height="46" rx="2" />
+                    <rect x="238" y="72" width="14" height="46" rx="2" />
+                    <rect x="264" y="72" width="14" height="46" rx="2" />
+                    <rect x="290" y="72" width="14" height="46" rx="2" />
+                    <rect x="316" y="72" width="14" height="46" rx="2" />
+                    <rect x="342" y="72" width="14" height="46" rx="2" />
+                    <rect x="368" y="72" width="14" height="46" rx="2" />
+                    <rect x="394" y="72" width="14" height="46" rx="2" />
+                  </g>
+                  <!-- Coldplate / Heatpipe Base -->
+                  <rect x="78" y="116" width="334" height="20" rx="4" fill="url(#gradHeatsink)" stroke="#38bdf8" stroke-width="1.2" />
+                  <text x="90" y="130" fill="#e0f2fe" font-family="JetBrains Mono" font-size="10.5" font-weight="600">4. COLDPLATE &amp; FIN STACK (T_s)</text>
+                </g>
+
+                <!-- LAYER 3: Copper IHS (Integrated Heat Spreader) (y=142..192) -->
+                <g class="layer-group cursor-pointer" data-layer="ihs">
+                  <path d="M110 142 L380 142 L396 192 L94 192 Z" fill="url(#gradIhs)" stroke="#f59e0b" stroke-width="1.3" />
+                  <text x="122" y="171" fill="#fef3c7" font-family="JetBrains Mono" font-size="11" font-weight="600">3. NICKEL-PLATED COPPER IHS (T_c)</text>
+                </g>
+
+                <!-- LAYER 2: Thermal Interface Material (TIM) (y=196..216) -->
+                <g class="layer-group cursor-pointer" data-layer="tim">
+                  <rect x="135" y="196" width="220" height="20" rx="3" fill="url(#gradTim)" stroke="#e879f9" stroke-width="1.3" />
+                  <text id="svgTimLabel" x="145" y="210" fill="#fae8ff" font-family="JetBrains Mono" font-size="10" font-weight="600">2. TIM BONDLINE (12.5 W/m·K)</text>
+                </g>
+
+                <!-- LAYER 1: Silicon Die (Heat Source) (y=220..274) -->
+                <g class="layer-group cursor-pointer" data-layer="die">
+                  <rect x="150" y="220" width="190" height="54" rx="6" fill="url(#gradDie)" stroke="#34d399" stroke-width="1.6" filter="url(#glowSoft)" />
+                  <!-- Internal Core Micro-Grid -->
+                  <g stroke="rgba(255,255,255,0.22)" stroke-width="0.8">
+                    <rect x="164" y="228" width="36" height="16" rx="2" fill="rgba(0,0,0,0.2)" />
+                    <rect x="206" y="228" width="36" height="16" rx="2" fill="rgba(0,0,0,0.2)" />
+                    <rect x="248" y="228" width="36" height="16" rx="2" fill="rgba(0,0,0,0.2)" />
+                    <rect x="290" y="228" width="36" height="16" rx="2" fill="rgba(0,0,0,0.2)" />
+                  </g>
+                  <text x="164" y="262" fill="#ffffff" font-family="JetBrains Mono" font-size="11" font-weight="700">1. SILICON DIE (T_j)</text>
+                </g>
+
+                <!-- Substrate PCB Base (Bottom) -->
+                <rect x="85" y="278" width="320" height="18" rx="3" fill="#0f172a" stroke="#334155" stroke-width="1" />
+                <text x="168" y="290" fill="#64748b" font-family="JetBrains Mono" font-size="9.5">ORGANIC SUBSTRATE &amp; SOCKET</text>
+
+                <!-- Animated Heat Flux Particles Layer -->
+                <g id="heatParticlesGroup"></g>
+
+                <!-- Right-Side Telemetry Callout Column (x=435..630) -->
+                <g font-family="JetBrains Mono">
+                  <!-- Air / Exhaust Callout -->
+                  <rect x="435" y="18" width="192" height="44" rx="6" fill="rgba(15,23,42,0.88)" stroke="rgba(56,189,248,0.3)" />
+                  <text x="445" y="35" fill="#94a3b8" font-size="9.5">EXHAUST / AMBIENT</text>
+                  <text id="svgCalloutAir" x="445" y="52" fill="#38bdf8" font-size="12" font-weight="700">24.2°C (Δ +2.2°)</text>
+
+                  <!-- Sink Callout -->
+                  <rect x="435" y="82" width="192" height="44" rx="6" fill="rgba(15,23,42,0.88)" stroke="rgba(56,189,248,0.3)" />
+                  <text x="445" y="99" fill="#94a3b8" font-size="9.5">HEATSINK / COOLANT (T_s)</text>
+                  <text id="svgCalloutSink" x="445" y="116" fill="#7dd3fc" font-size="12" font-weight="700">28.9°C | R:0.165</text>
+
+                  <!-- IHS Callout -->
+                  <rect x="435" y="145" width="192" height="44" rx="6" fill="rgba(15,23,42,0.88)" stroke="rgba(245,158,11,0.35)" />
+                  <text x="445" y="162" fill="#94a3b8" font-size="9.5">COPPER IHS CASE (T_c)</text>
+                  <text id="svgCalloutIhs" x="445" y="179" fill="#fbbf24" font-size="12" font-weight="700">32.5°C | R:0.085</text>
+
+                  <!-- TIM Drop Callout -->
+                  <rect x="435" y="195" width="192" height="32" rx="6" fill="rgba(15,23,42,0.88)" stroke="rgba(232,121,249,0.4)" />
+                  <text id="svgCalloutTim" x="445" y="215" fill="#e879f9" font-size="11" font-weight="700">TIM ΔT: 1.6°C (10%)</text>
+
+                  <!-- Die Junction Callout -->
+                  <rect x="435" y="233" width="192" height="48" rx="6" fill="rgba(15,23,42,0.92)" stroke="rgba(16,185,129,0.45)" />
+                  <text x="445" y="250" fill="#94a3b8" font-size="9.5">JUNCTION TEMP (T_j)</text>
+                  <text id="svgCalloutDie" x="445" y="269" fill="#34d399" font-size="13" font-weight="700">38.4°C | Q: 42W</text>
+                </g>
+
+                <!-- Legend Footer inside SVG -->
+                <text x="20" y="324" fill="#64748b" font-family="JetBrains Mono" font-size="10">
+                  ● Particle velocity &amp; density scale with heat flux Q (W) | Click any layer to inspect resistance share
+                </text>
+              </svg>
+            </div>
+
+            <!-- Right-Side Layer Resistance & Bottleneck Breakdown -->
+            <div class="xl:col-span-4 space-y-3">
+              <div class="glass-subcard p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-slate-200">Thermal Impedance Share</span>
+                  <span class="text-[11px] font-mono text-slate-400">°C/W (%)</span>
+                </div>
+
+                <!-- Bar 1: Die-to-IHS Internal -->
+                <div class="space-y-1">
+                  <div class="flex justify-between text-[11px] font-mono">
+                    <span class="text-slate-300">Die → IHS Solder</span>
+                    <span id="resDieShare" class="text-slate-200">0.075 (21%)</span>
+                  </div>
+                  <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                    <div id="barDieShare" class="h-full bg-emerald-400 rounded-full transition-all duration-300" style="width: 21%"></div>
+                  </div>
+                </div>
+
+                <!-- Bar 2: TIM Bondline -->
+                <div class="space-y-1">
+                  <div class="flex justify-between text-[11px] font-mono">
+                    <span class="text-fuchsia-300">TIM Bondline</span>
+                    <span id="resTimShare" class="text-fuchsia-300">0.037 (10%)</span>
+                  </div>
+                  <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                    <div id="barTimShare" class="h-full bg-fuchsia-400 rounded-full transition-all duration-300" style="width: 10%"></div>
+                  </div>
+                </div>
+
+                <!-- Bar 3: Heatsink / Coldplate -->
+                <div class="space-y-1">
+                  <div class="flex justify-between text-[11px] font-mono">
+                    <span class="text-amber-300">Coldplate / Heatpipes</span>
+                    <span id="resSinkShare" class="text-amber-300">0.085 (23%)</span>
+                  </div>
+                  <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                    <div id="barSinkShare" class="h-full bg-amber-400 rounded-full transition-all duration-300" style="width: 23%"></div>
+                  </div>
+                </div>
+
+                <!-- Bar 4: Convective Airflow -->
+                <div class="space-y-1">
+                  <div class="flex justify-between text-[11px] font-mono">
+                    <span class="text-sky-300">Convective Airflow</span>
+                    <span id="resConvShare" class="text-sky-300">0.165 (46%)</span>
+                  </div>
+                  <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                    <div id="barConvShare" class="h-full bg-sky-400 rounded-full transition-all duration-300" style="width: 46%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Selected Layer Inspector Box -->
+              <div id="layerInspectorBox" class="glass-subcard p-3.5 border-sky-500/25">
+                <div class="flex items-center justify-between mb-1">
+                  <span id="inspectorTitle" class="text-xs font-mono font-semibold text-sky-400">LAYER: TIM BONDLINE</span>
+                  <span id="inspectorDelta" class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-fuchsia-500/15 text-fuchsia-300">ΔT: 1.6°C</span>
+                </div>
+                <p id="inspectorDesc" class="text-xs text-slate-300 leading-relaxed">
+                  Conductive interface filling microscopic surface asperities between copper IHS and cooler coldplate. Follows R_θ = L / (k · A).
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel D: 60-Second Rolling Real-Time Telemetry Oscilloscope -->
+        <div class="glass-card p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 mb-3">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                60-Second Transient Thermal &amp; Power Telemetry
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">Live rolling plot of Junction Temp, Case Temp, Package Power, and Clock Efficiency</p>
+            </div>
+
+            <!-- Interactive Chart Series Legend -->
+            <div class="flex flex-wrap items-center gap-3 text-xs font-mono">
+              <span class="flex items-center gap-1.5 text-rose-400">
+                <span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span> T<sub>j</sub> (°C)
+              </span>
+              <span class="flex items-center gap-1.5 text-amber-400">
+                <span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span> T<sub>c</sub> (°C)
+              </span>
+              <span class="flex items-center gap-1.5 text-sky-400">
+                <span class="w-2.5 h-2.5 rounded-sm bg-sky-400"></span> Power (W)
+              </span>
+              <span class="flex items-center gap-1.5 text-emerald-400">
+                <span class="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span> Clock Eff (%)
+              </span>
+            </div>
+          </div>
+
+          <!-- Responsive HTML5 Canvas Wrapper -->
+          <div id="chartContainer" class="relative w-full h-64 sm:h-72 bg-[#070a10] rounded-xl border border-slate-800/90 overflow-hidden">
+            <canvas id="telemetryChartCanvas" class="block w-full h-full"></canvas>
+            <!-- Hover Crosshair Readout Pill -->
+            <div id="chartTooltip" class="hidden pointer-events-none absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-slate-950/90 border border-sky-500/30 text-[11px] font-mono text-slate-200 shadow-xl">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROW 3: Dynamic Performance & Efficiency Recommendation Engine -->
+    <section aria-label="Dynamic Performance and Thermal Optimization Engine" class="glass-card p-5 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="text-sm sm:text-base font-semibold text-slate-100 flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+            Dynamic Performance &amp; Heat Transference Optimization Engine
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Real-time bottleneck classification with physics-simulated BIOS, physical cooling, and OS scheduler actions</p>
+        </div>
+
+        <!-- Primary Bottleneck Badge -->
+        <div id="bottleneckBanner" class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono">
+          <span class="text-slate-400">DOMINANT REGIME:</span>
+          <span id="bottleneckLabel" class="text-emerald-400 font-bold">BALANCED THERMAL EQUILIBRIUM</span>
+        </div>
+      </div>
+
+      <!-- Bottleneck Physics Explanation -->
+      <p id="bottleneckExplanation" class="text-xs sm:text-sm text-slate-300 bg-slate-900/60 border border-slate-800 rounded-xl p-3 leading-relaxed">
+        Evaluating live thermal resistance network and dynamic power density...
+      </p>
+
+      <!-- Ranked Optimization Action Cards Grid -->
+      <div id="recommendationsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <!-- Populated dynamically by RecommendationEngine -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Browser Hardware Sandbox Info Modal -->
+  <div id="sandboxModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+    <div class="glass-card max-w-xl w-full p-6 space-y-4 border-sky-400/30 shadow-2xl">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-slate-100">Browser Hardware Sandbox Architecture</h3>
+            <p class="text-xs font-mono text-sky-400">W3C Compute Pressure + Thermal Ohm's Law Solver</p>
+          </div>
+        </div>
+        <button id="closeSandboxModalBtn" type="button" class="text-slate-400 hover:text-slate-200 p-1 rounded-lg cursor-pointer">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+        <p>
+          <strong class="text-slate-100">Why browsers cannot directly read motherboard thermistors:</strong> Modern web browsers enforce strict OS security sandboxing to prevent side-channel attacks (such as Spectre/Meltdown thermal timing leaks) and block direct ring-0 access to CPU Model-Specific Registers (MSRs) or SMBus sensor chips.
+        </p>
+        <p>
+          <strong class="text-sky-300">How THERMALFLUX bridges this gap:</strong>
+        </p>
+        <ul class="list-disc pl-5 space-y-1.5 text-slate-300">
+          <li><strong class="text-slate-100">W3C Compute Pressure API:</strong> Queries OS-level CPU telemetry states (<code class="font-mono text-emerald-400">nominal</code>, <code class="font-mono text-amber-400">fair</code>, <code class="font-mono text-orange-400">serious</code>, <code class="font-mono text-red-400">critical</code>) when supported by the browser.</li>
+          <li><strong class="text-slate-100">Multi-Core Web Worker Stress Engine:</strong> Spawns real background threads executing floating-point &amp; prime workloads while measuring main-thread event-loop jitter.</li>
+          <li><strong class="text-slate-100">Coupled Cauer RC Thermal ODE Model:</strong> Solves transient heat conduction and convection ($dT/dt = (P_{\text{in}} - Q_{\text{out}})/C_{\text{th}}$) across Silicon Die, TIM, Copper IHS, and Heatsink nodes.</li>
+          <li><strong class="text-slate-100">External Sensor Log Ingestion:</strong> Directly imports real hardware telemetry CSV/JSON logs exported from <em>HWiNFO64</em> or <em>CoreTemp</em>.</li>
+        </ul>
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button id="ackSandboxModalBtn" type="button"
+          class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs transition cursor-pointer">
+          Got It, Return to Telemetry
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Non-blocking Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- Core Application Logic -->
+  <script>
+    /**
+     * THERMALFLUX // CPU Heat Transference & Performance Telemetry
+     * Self-contained Thermodynamic ODE Solver, Multi-Core Web Worker Stress Engine,
+     * Animated SVG Heat Flux Renderer, and Dynamic Recommendation Engine.
+     */
+
+    // =========================================================================
+    // 1. PHYSICAL CONSTANTS & HARDWARE CONFIGURATIONS
+    // =========================================================================
+    const CONFIG = {
+      TJ_MAX: 100.0,           // °C Thermal throttle ceiling
+      THROTTLE_START: 92.0,    // °C Soft boost clock rollback onset
+      V_NOM: 1.20,             // Nominal core voltage (V)
+      DIE_AREA_CM2: 1.80,      // Active hotspot die area (cm^2)
+      IHS_AREA_M2: 0.001406,   // 37.5mm x 37.5mm IHS contact area (m^2)
+      R_DIE_IHS: 0.072,        // °C/W internal silicon-to-IHS solder resistance
+
+      // Thermal Interface Materials (k in W/m·K, bondline thickness L in meters)
+      TIM_OPTIONS: {
+        standard: {
+          name: 'Standard Paste',
+          k: 8.5,
+          thicknessM: 85e-6,
+          desc: 'Standard silicone thermal grease (8.5 W/m·K, ~85μm bondline). Prone to pump-out under high thermal cycling.'
+        },
+        enthusiast: {
+          name: 'Enthusiast Paste',
+          k: 12.5,
+          thicknessM: 65e-6,
+          desc: 'High-viscosity nano-particle paste (12.5 W/m·K, ~65μm bondline). Balanced conductivity and longevity.'
+        },
+        ptm7950: {
+          name: 'PTM7950 Phase-Change',
+          k: 8.5,
+          thicknessM: 32e-6,
+          desc: 'Industrial phase-change pad (8.5 W/m·K) that liquefies above 45°C to achieve an ultra-thin ~32μm bondline.'
+        },
+        liquid_metal: {
+          name: 'Liquid Metal',
+          k: 73.0,
+          thicknessM: 28e-6,
+          desc: 'Gallium-indium-tin eutectic alloy (73.0 W/m·K). Near-zero conductive resistance across the IHS boundary.'
+        }
+      },
+
+      // Cooling Architectures (conduction R_sink in °C/W, convective parameters, thermal capacitances J/K)
+      COOLER_OPTIONS: {
+        low_profile: {
+          name: 'Low-Profile Air',
+          rSink: 0.165,
+          hBase: 28,
+          hMax: 95,
+          surfaceAreaM2: 0.042,
+          cSink: 32.0,
+          maxAirCfm: 34,
+          desc: 'Compact downdraft heatsink (~100W class). Limited fin surface area increases convective resistance.'
+        },
+        dual_tower: {
+          name: 'Dual-Tower Air',
+          rSink: 0.082,
+          hBase: 42,
+          hMax: 155,
+          surfaceAreaM2: 0.068,
+          cSink: 68.0,
+          maxAirCfm: 68,
+          desc: 'Dual-fin-stack 6-heatpipe tower (~220W class). Strong fin area with responsive airflow scaling.'
+        },
+        aio_240: {
+          name: '240mm AIO Liquid',
+          rSink: 0.058,
+          hBase: 55,
+          hMax: 195,
+          surfaceAreaM2: 0.082,
+          cSink: 125.0,
+          maxAirCfm: 82,
+          desc: 'Copper micro-fin coldplate + 240mm aluminum radiator. High liquid thermal mass buffers transient bursts.'
+        },
+        custom_360: {
+          name: '360mm Custom Loop',
+          rSink: 0.036,
+          hBase: 72,
+          hMax: 265,
+          surfaceAreaM2: 0.115,
+          cSink: 185.0,
+          maxAirCfm: 115,
+          desc: 'High-flow D5 pump + thick 360mm copper radiator. Maximum heat dissipation and thermal headroom.'
+        }
+      },
+
+      // Scenario Presets
+      PRESETS: {
+        idle: { workload: 8, tdp: 125, vcore: -30, tim: 'enthusiast', cooler: 'dual_tower', fan: 35, ambient: 22 },
+        gaming: { workload: 62, tdp: 165, vcore: -25, tim: 'enthusiast', cooler: 'dual_tower', fan: 70, ambient: 23 },
+        bottleneck_tim: { workload: 92, tdp: 190, vcore: 0, tim: 'standard', cooler: 'aio_240', fan: 80, ambient: 24 },
+        throttling_sff: { workload: 100, tdp: 220, vcore: 25, tim: 'standard', cooler: 'low_profile', fan: 90, ambient: 27 },
+        custom_loop: { workload: 100, tdp: 240, vcore: -85, tim: 'liquid_metal', cooler: 'custom_360', fan: 85, ambient: 21 }
+      },
+
+      // Layer Inspector Metadata
+      LAYER_INFO: {
+        die: {
+          title: 'LAYER 1: SILICON DIE (HOTSPOT)',
+          desc: 'Monolithic or chiplet CMOS transistors switching at GHz frequencies. Generates Joule heat P = C·V²·f concentrated over ~1.8 cm².'
+        },
+        tim: {
+          title: 'LAYER 2: TIM BONDLINE',
+          desc: 'Conductive interface filling microscopic surface asperities between copper IHS and cooler coldplate. Follows R_θ = L / (k · A).'
+        },
+        ihs: {
+          title: 'LAYER 3: NICKEL-PLATED COPPER IHS',
+          desc: 'Spreads concentrated silicon die heat flux laterally across a larger 37.5×37.5 mm surface area before entering the coldplate.'
+        },
+        heatsink: {
+          title: 'LAYER 4: COLDPLATE & HEATPIPES',
+          desc: 'Two-phase vapor-wick heatpipes or micro-skived liquid coldplate transporting thermal energy rapidly into the fin stack.'
+        },
+        convection: {
+          title: 'LAYER 5: CONVECTIVE AIRFLOW',
+          desc: 'Forced-air boundary layer heat transfer Q = h(RPM)·A·(T_s - T_amb). Governed by static pressure, fan duty cycle, and ambient room temp.'
+        }
+      }
+    };
+
+    // =========================================================================
+    // 2. APPLICATION STATE
+    // =========================================================================
+    const STATE = {
+      // Hardware & User Controls
+      workload: 35,           // %
+      tdp: 150,               // W
+      vcoreOffsetMv: 0,       // mV (-150 to +50)
+      timKey: 'enthusiast',
+      coolerKey: 'dual_tower',
+      fanDuty: 65,            // %
+      ambientTemp: 22,        // °C
+
+      // Live Browser Telemetry & Stress Engine
+      logicalCores: navigator.hardwareConcurrency || 8,
+      pressureState: 'initializing', // 'nominal' | 'fair' | 'serious' | 'critical' | 'sandbox_fallback'
+      pressureSupported: false,
+      syncTelemetry: false,
+      workerThreads: Math.min(4, navigator.hardwareConcurrency || 4),
+      stressIntensity: 0,     // 0 - 100%
+      liveEffectiveLoad: 0,   // %
+      eventLoopJitterMs: 0.2, // ms
+      workerOpsPerSec: 0,     // Millions of ops/sec
+
+      // Imported Sensor Log Playback
+      importedLog: null,      // Array of { load, power, temp, fan }
+      importedFileName: '',
+      logIndex: 0,
+
+      // Coupled 3-Node Cauer Thermal State (°C)
+      tDie: 38.4,
+      tIhs: 32.5,
+      tSink: 28.9,
+      tExhaust: 24.2,
+
+      // Instantaneous Computed Telemetry
+      powerRaw: 42.0,
+      powerEffective: 42.0,
+      vcoreActual: 1.20,
+      rDieIhs: 0.072,
+      rTim: 0.037,
+      rSink: 0.082,
+      rConv: 0.165,
+      rTotal: 0.356,
+      qDieToIhs: 42.0,
+      qIhsToSink: 42.0,
+      qSinkToAir: 42.0,
+      heatDensityWcm2: 23.3,
+      clockEfficiency: 100.0,
+      throttlePenalty: 0.0,
+      estClockGhz: 5.10,
+
+      // UI Inspection & History
+      selectedLayer: 'tim',
+      history: [],            // Rolling 60s buffer (1 sample per 0.5s -> 120 points)
+      lastChartSampleTime: 0,
+      lastRecUpdateTime: 0
+    };
+
+    // =========================================================================
+    // 3. MULTI-CORE WEB WORKER STRESS ENGINE (INLINE BLOB WORKERS)
+    // =========================================================================
+    const WorkerStressEngine = {
+      workers: [],
+      opsCounters: [],
+      lastOpsCheck: performance.now(),
+
+      createWorkerBlobUrl() {
+        const workerCode = `
+          let intensity = 0;
+          let running = true;
+
+          self.onmessage = function(e) {
+            if (typeof e.data.intensity === 'number') {
+              intensity = Math.max(0, Math.min(100, e.data.intensity));
+            }
+            if (e.data.cmd === 'stop') {
+              running = false;
+              self.close();
+            }
+          };
+
+          function stressLoop() {
+            if (!running) return;
+            if (intensity <= 0) {
+              setTimeout(stressLoop, 80);
+              return;
+            }
+            // Duty cycle within a 40ms timeslice
+            const sliceMs = 40;
+            const workMs = (intensity / 100) * sliceMs;
+            const start = performance.now();
+            let ops = 0;
+            let acc = 1.0001;
+
+            while ((performance.now() - start) < workMs) {
+              for (let i = 0; i < 2000; i++) {
+                acc = Math.sin(acc) * Math.cos(acc) + Math.sqrt(Math.abs(acc) + 1.2345);
+              }
+              ops += 2000;
+            }
+            self.postMessage({ ops });
+            const remaining = Math.max(1, sliceMs - (performance.now() - start));
+            setTimeout(stressLoop, remaining);
+          }
+
+          stressLoop();
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        return URL.createObjectURL(blob);
+      },
+
+      syncPoolSize(targetCount) {
+        while (this.workers.length > targetCount) {
+          const w = this.workers.pop();
+          this.opsCounters.pop();
+          w.postMessage({ cmd: 'stop' });
+          w.terminate();
+        }
+        if (this.workers.length < targetCount) {
+          const url = this.createWorkerBlobUrl();
+          while (this.workers.length < targetCount) {
+            const idx = this.workers.length;
+            const w = new Worker(url);
+            this.opsCounters[idx] = 0;
+            w.onmessage = (e) => {
+              if (e.data && typeof e.data.ops === 'number') {
+                this.opsCounters[idx] += e.data.ops;
+              }
+            };
+            w.postMessage({ intensity: STATE.stressIntensity });
+            this.workers.push(w);
+          }
+          URL.revokeObjectURL(url);
+        }
+      },
+
+      setIntensity(intensity) {
+        STATE.stressIntensity = intensity;
+        this.syncPoolSize(STATE.workerThreads);
+        for (const w of this.workers) {
+          w.postMessage({ intensity });
+        }
+      },
+
+      updateMetrics() {
+        const now = performance.now();
+        const elapsedSec = (now - this.lastOpsCheck) / 1000;
+        if (elapsedSec >= 0.5) {
+          let totalOps = 0;
+          for (let i = 0; i < this.opsCounters.length; i++) {
+            totalOps += this.opsCounters[i];
+            this.opsCounters[i] = 0;
+          }
+          STATE.workerOpsPerSec = (totalOps / elapsedSec) / 1e6;
+          this.lastOpsCheck = now;
+
+          // Compute effective host CPU utilization from worker threads & duty cycle + jitter
+          const threadRatio = STATE.workerThreads / Math.max(1, STATE.logicalCores);
+          const workerLoad = STATE.stressIntensity * Math.min(1.0, threadRatio);
+          const jitterLoad = Math.min(18, Math.max(0, (STATE.eventLoopJitterMs - 0.5) * 2.5));
+          STATE.liveEffectiveLoad = Math.min(100, Math.max(0, workerLoad + jitterLoad));
+
+          // Update synthetic pressure if browser API is in fallback mode
+          if (!STATE.pressureSupported) {
+            if (STATE.liveEffectiveLoad > 85) STATE.pressureState = 'serious';
+            else if (STATE.liveEffectiveLoad > 55) STATE.pressureState = 'fair';
+            else STATE.pressureState = 'nominal';
+          }
+        }
+      }
+    };
+
+    // Main-thread Event-Loop Jitter Monitor
+    let lastFrameTimestamp = performance.now();
+    function measureEventLoopJitter(now) {
+      const delta = now - lastFrameTimestamp;
+      lastFrameTimestamp = now;
+      // Expected frame interval ~16.67ms at 60Hz; excess indicates main-thread scheduling latency
+      const excess = Math.max(0, delta - 16.7);
+      STATE.eventLoopJitterMs = STATE.eventLoopJitterMs * 0.88 + excess * 0.12;
+      requestAnimationFrame(measureEventLoopJitter);
+    }
+
+    // =========================================================================
+    // 4. W3C COMPUTE PRESSURE API MONITOR
+    // =========================================================================
+    async function initComputePressure() {
+      const badgeText = document.getElementById('pressureStateText');
+      const badgeDot = document.getElementById('pressureDot');
+
+      if ('PressureObserver' in window) {
+        try {
+          const observer = new PressureObserver((records) => {
+            const latest = records[records.length - 1];
+            if (latest && latest.state) {
+              STATE.pressureSupported = true;
+              STATE.pressureState = latest.state;
+              updatePressureBadgeUI();
+            }
+          });
+          await observer.observe('cpu', { sampleInterval: 500 });
+          STATE.pressureSupported = true;
+          STATE.pressureState = 'nominal';
+          updatePressureBadgeUI();
+          return;
+        } catch (err) {
+          // Permissions-Policy or iframe sandbox restriction -> fallback gracefully
+          console.info('Compute Pressure API restricted by sandbox, using telemetry fallback:', err.message);
+        }
+      }
+
+      STATE.pressureSupported = false;
+      STATE.pressureState = 'nominal';
+      badgeText.textContent = 'SANDBOX FALLBACK';
+      badgeText.className = 'text-sky-400 font-semibold';
+      badgeDot.className = 'w-2 h-2 rounded-full bg-sky-400';
+    }
+
+    function updatePressureBadgeUI() {
+      const badgeText = document.getElementById('pressureStateText');
+      const badgeDot = document.getElementById('pressureDot');
+      if (!STATE.pressureSupported) {
+        badgeText.textContent = `SANDBOX (${STATE.pressureState.toUpperCase()})`;
+        return;
+      }
+      const map = {
+        nominal: { label: 'NOMINAL', color: 'text-emerald-400', dot: 'bg-emerald-400' },
+        fair: { label: 'FAIR', color: 'text-sky-400', dot: 'bg-sky-400' },
+        serious: { label: 'SERIOUS', color: 'text-amber-400', dot: 'bg-amber-400' },
+        critical: { label: 'CRITICAL', color: 'text-red-400', dot: 'bg-red-400' }
+      };
+      const cfg = map[STATE.pressureState] || map.nominal;
+      badgeText.textContent = cfg.label;
+      badgeText.className = `${cfg.color} font-semibold`;
+      badgeDot.className = `w-2 h-2 rounded-full ${cfg.dot}`;
+    }
+
+    // =========================================================================
+    // 5. HWiNFO64 / CORETEMP CSV & JSON LOG IMPORTER
+    // =========================================================================
+    const LogImporter = {
+      parseText(content, fileName) {
+        const trimmed = content.trim();
+        let records = [];
+
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+          const parsed = JSON.parse(trimmed);
+          const arr = Array.isArray(parsed) ? parsed : (parsed.samples || parsed.data || [parsed]);
+          records = arr.map(row => ({
+            load: Number(row.load ?? row.usage ?? row.cpuLoad ?? 50),
+            power: Number(row.power ?? row.packagePower ?? row.watts ?? 95),
+            temp: Number(row.temp ?? row.tj ?? row.temperature ?? 65),
+            fan: Number(row.fan ?? row.fanDuty ?? 65)
+          })).filter(r => !Number.isNaN(r.load));
+        } else {
+          // CSV Parser supporting HWiNFO64, CoreTemp, and generic sensor headers
+          const lines = trimmed.split(/\r?\n/).filter(l => l.trim().length > 0);
+          if (lines.length < 2) throw new Error('CSV requires a header row and at least one data row.');
+
+          const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+          const idxLoad = headers.findIndex(h => h.includes('usage') || h.includes('load') || h.includes('util'));
+          const idxPower = headers.findIndex(h => h.includes('package power') || h.includes('power') || h.includes('[w]'));
+          const idxTemp = headers.findIndex(h => h.includes('package') && h.includes('°c') || h.includes('core temp') || h.includes('temp'));
+          const idxFan = headers.findIndex(h => h.includes('fan') || h.includes('rpm'));
+
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => parseFloat(c.replace(/^"|"$/g, '').trim()));
+            if (cols.every(n => Number.isNaN(n))) continue;
+            const load = idxLoad >= 0 && !Number.isNaN(cols[idxLoad]) ? Math.min(100, Math.max(0, cols[idxLoad])) : 50;
+            const power = idxPower >= 0 && !Number.isNaN(cols[idxPower]) ? Math.max(10, cols[idxPower]) : null;
+            const temp = idxTemp >= 0 && !Number.isNaN(cols[idxTemp]) ? cols[idxTemp] : null;
+            const fan = idxFan >= 0 && !Number.isNaN(cols[idxFan]) ? (cols[idxFan] > 100 ? Math.min(100, Math.round(cols[idxFan] / 22)) : cols[idxFan]) : null;
+            records.push({ load, power, temp, fan });
+          }
+        }
+
+        if (records.length === 0) {
+          throw new Error('No valid numeric sensor telemetry rows detected in file.');
+        }
+
+        STATE.importedLog = records;
+        STATE.importedFileName = fileName;
+        STATE.logIndex = 0;
+
+        document.getElementById('logPlaybackBar').classList.remove('hidden');
+        document.getElementById('logFileName').textContent = fileName;
+        document.getElementById('logProgressText').textContent = `1/${records.length}`;
+        showToast(`Loaded ${records.length} telemetry samples from ${fileName}`, 'success');
+      },
+
+      loadSampleTrace() {
+        // Realistic 24-step HWiNFO64 Cinebench / Gaming thermal ramp trace
+        const sampleCsv = [
+          'Time,Total CPU Usage [%],CPU Package Power [W],CPU Package [°C],CPU Fan [RPM]',
+          '00:01,12,24.5,39.0,850',
+          '00:02,15,28.0,40.5,880',
+          '00:03,68,118.4,64.0,1320',
+          '00:04,96,172.0,79.5,1680',
+          '00:05,100,185.5,84.2,1820',
+          '00:06,100,188.0,86.8,1900',
+          '00:07,100,186.4,88.1,1950',
+          '00:08,100,185.0,89.0,1980',
+          '00:09,100,184.2,89.6,2000',
+          '00:10,98,179.0,88.9,1980',
+          '00:11,64,112.0,72.4,1540',
+          '00:12,58,104.5,68.0,1450',
+          '00:13,62,110.2,69.1,1480',
+          '00:14,22,36.0,49.5,1050',
+          '00:15,14,26.2,43.0,920',
+          '00:16,10,22.8,40.2,860'
+        ].join('\n');
+        this.parseText(sampleCsv, 'HWiNFO64_Cinebench_Sample.csv');
+      },
+
+      stepPlayback() {
+        if (!STATE.importedLog || STATE.importedLog.length === 0) return;
+        const sample = STATE.importedLog[STATE.logIndex];
+        STATE.workload = Math.round(sample.load);
+        if (sample.power !== null && sample.power > 15) {
+          STATE.tdp = Math.min(250, Math.max(15, Math.round(sample.power / 5) * 5));
+        }
+        if (sample.fan !== null) {
+          STATE.fanDuty = Math.min(100, Math.max(20, Math.round(sample.fan)));
+        }
+        syncControlInputsFromState();
+
+        document.getElementById('logProgressText').textContent = `${STATE.logIndex + 1}/${STATE.importedLog.length}`;
+        STATE.logIndex = (STATE.logIndex + 1) % STATE.importedLog.length;
+      },
+
+      stop() {
+        STATE.importedLog = null;
+        STATE.importedFileName = '';
+        document.getElementById('logPlaybackBar').classList.add('hidden');
+        showToast('Stopped sensor log playback', 'info');
+      }
+    };
+
+    // =========================================================================
+    // 6. THERMODYNAMIC & HEAT TRANSFERENCE PHYSICS ENGINE (CAUER RC SOLVER)
+    // =========================================================================
+    const ThermalPhysicsEngine = {
+      computeResistances(timKey, coolerKey, fanDuty) {
+        const tim = CONFIG.TIM_OPTIONS[timKey];
+        const cooler = CONFIG.COOLER_OPTIONS[coolerKey];
+
+        // Conductive TIM Resistance: R = L / (k * A)
+        const rTim = tim.thicknessM / (tim.k * CONFIG.IHS_AREA_M2);
+
+        // Convective Heat Transfer Coefficient h(RPM) scaling nonlinearly with fan duty
+        const fanFraction = (fanDuty - 20) / 80; // 0.0 at 20%, 1.0 at 100%
+        const hCoeff = cooler.hBase + (cooler.hMax - cooler.hBase) * Math.pow(Math.max(0, fanFraction), 0.82);
+        const rConv = 1.0 / (hCoeff * cooler.surfaceAreaM2);
+
+        const rDieIhs = CONFIG.R_DIE_IHS;
+        const rSink = cooler.rSink;
+        const rTotal = rDieIhs + rTim + rSink + rConv;
+
+        return { rDieIhs, rTim, rSink, rConv, rTotal, hCoeff };
+      },
+
+      computeRawPower(workload, tdp, vcoreOffsetMv) {
+        const pIdle = 10.0 + 0.045 * tdp;
+        const loadFactor = Math.pow(Math.max(0, Math.min(100, workload)) / 100, 1.15);
+        const vActual = CONFIG.V_NOM + (vcoreOffsetMv / 1000);
+        const vRatioSq = Math.pow(vActual / CONFIG.V_NOM, 2);
+        const pTotal = pIdle + (tdp - pIdle) * loadFactor * vRatioSq;
+        return { pTotal, vActual };
+      },
+
+      // Advance coupled 3-node thermal ODE by dt seconds
+      step(dt) {
+        // 1. Determine active workload (either live telemetry sync or manual slider)
+        if (STATE.syncTelemetry && !STATE.importedLog) {
+          STATE.workload = Math.round(STATE.liveEffectiveLoad);
+          const slider = document.getElementById('workloadSlider');
+          const valLabel = document.getElementById('workloadVal');
+          if (slider) slider.value = STATE.workload;
+          if (valLabel) valLabel.textContent = `${STATE.workload}%`;
+        }
+
+        // 2. Compute thermal resistance network
+        const res = this.computeResistances(STATE.timKey, STATE.coolerKey, STATE.fanDuty);
+        STATE.rDieIhs = res.rDieIhs;
+        STATE.rTim = res.rTim;
+        STATE.rSink = res.rSink;
+        STATE.rConv = res.rConv;
+        STATE.rTotal = res.rTotal;
+
+        // 3. Compute dynamic electrical power & thermal throttling feedback
+        const { pTotal, vActual } = this.computeRawPower(STATE.workload, STATE.tdp, STATE.vcoreOffsetMv);
+        STATE.powerRaw = pTotal;
+        STATE.vcoreActual = vActual;
+
+        // Realistic Precision Boost / Thermal Velocity throttling curve between 92°C and 100°C
+        let throttleFactor = 1.0;
+        if (STATE.tDie > CONFIG.THROTTLE_START) {
+          const over = Math.min(1.0, (STATE.tDie - CONFIG.THROTTLE_START) / (CONFIG.TJ_MAX - CONFIG.THROTTLE_START));
+          // Curb power smoothly so Tj clamps safely near TJ_MAX
+          const pMaxSustainable = Math.max(25, (CONFIG.TJ_MAX - STATE.ambientTemp) / Math.max(0.12, STATE.rTotal));
+          const targetPower = pTotal * (1 - over * 0.45) + Math.min(pTotal, pMaxSustainable) * (over * 0.45);
+          throttleFactor = Math.min(1.0, Math.max(0.45, targetPower / Math.max(1, pTotal)));
+        }
+
+        STATE.powerEffective = pTotal * throttleFactor;
+        // Clock efficiency scales roughly with cube-root of throttled power ratio + slight undervolt boost headroom
+        const undervoltBoostBonus = STATE.vcoreOffsetMv < 0 && STATE.tDie < 88 ? Math.min(2.4, Math.abs(STATE.vcoreOffsetMv) * 0.016) : 0;
+        const rawEff = Math.pow(throttleFactor, 0.42) * 100 + (throttleFactor >= 0.999 ? undervoltBoostBonus : 0);
+        STATE.clockEfficiency = Math.min(102.5, Math.max(45.0, rawEff));
+        STATE.throttlePenalty = Math.max(0, 100 - Math.pow(throttleFactor, 0.42) * 100);
+        STATE.estClockGhz = (5.10 * (STATE.clockEfficiency / 100));
+
+        // 4. Integrate 3-Node Cauer Thermal RC Network (sub-stepped for numerical stability)
+        const cooler = CONFIG.COOLER_OPTIONS[STATE.coolerKey];
+        const cDie = 1.6;          // J/K (Silicon die low thermal mass -> rapid response)
+        const cIhs = 12.5;         // J/K (Copper IHS)
+        const cSink = cooler.cSink;// J/K (Heatsink fin array or AIO coolant loop)
+
+        const rDieToIhsTotal = STATE.rDieIhs + STATE.rTim;
+        const subSteps = 4;
+        const subDt = dt / subSteps;
+
+        let q1 = 0, q2 = 0, q3 = 0;
+        for (let i = 0; i < subSteps; i++) {
+          q1 = (STATE.tDie - STATE.tIhs) / rDieToIhsTotal;
+          q2 = (STATE.tIhs - STATE.tSink) / STATE.rSink;
+          q3 = (STATE.tSink - STATE.ambientTemp) / STATE.rConv;
+
+          STATE.tDie += ((STATE.powerEffective - q1) / cDie) * subDt;
+          STATE.tIhs += ((q1 - q2) / cIhs) * subDt;
+          STATE.tSink += ((q2 - q3) / cSink) * subDt;
+        }
+
+        // Clamp physical lower bounds to ambient
+        STATE.tDie = Math.max(STATE.ambientTemp, STATE.tDie);
+        STATE.tIhs = Math.max(STATE.ambientTemp, STATE.tIhs);
+        STATE.tSink = Math.max(STATE.ambientTemp, STATE.tSink);
+
+        // 5. Boundary Heat Fluxes & Exhaust Air Temperature
+        STATE.qDieToIhs = Math.max(0, q1);
+        STATE.qIhsToSink = Math.max(0, q2);
+        STATE.qSinkToAir = Math.max(0, q3);
+        STATE.heatDensityWcm2 = STATE.powerEffective / CONFIG.DIE_AREA_CM2;
+
+        // Exhaust air temperature rise: dT_air = Q_conv / (rho * Cp * VolumetricFlow)
+        // 1 CFM ≈ 0.0004719 m³/s; rho*Cp for air ≈ 1200 J/(m³·K) -> 0.566 W/(CFM·K)
+        const activeCfm = cooler.maxAirCfm * (0.25 + 0.75 * (STATE.fanDuty / 100));
+        const airHeatCapacityRate = activeCfm * 0.566;
+        STATE.tExhaust = STATE.ambientTemp + (STATE.qSinkToAir / Math.max(4.0, airHeatCapacityRate));
+      },
+
+      // Steady-state counterfactual predictor for Recommendation Engine impact badges
+      predictSteadyState(overrides) {
+        const workload = overrides.workload ?? STATE.workload;
+        const tdp = overrides.tdp ?? STATE.tdp;
+        const vcoreOffsetMv = overrides.vcoreOffsetMv ?? STATE.vcoreOffsetMv;
+        const timKey = overrides.timKey ?? STATE.timKey;
+        const coolerKey = overrides.coolerKey ?? STATE.coolerKey;
+        const fanDuty = overrides.fanDuty ?? STATE.fanDuty;
+        const ambientTemp = overrides.ambientTemp ?? STATE.ambientTemp;
+
+        const res = this.computeResistances(timKey, coolerKey, fanDuty);
+        const { pTotal } = this.computeRawPower(workload, tdp, vcoreOffsetMv);
+
+        let tj = ambientTemp + pTotal * res.rTotal;
+        let throttleFactor = 1.0;
+        if (tj > CONFIG.THROTTLE_START) {
+          const pMax = Math.max(25, (CONFIG.TJ_MAX - ambientTemp) / Math.max(0.12, res.rTotal));
+          throttleFactor = Math.min(1.0, Math.max(0.45, pMax / Math.max(1, pTotal)));
+          tj = ambientTemp + (pTotal * throttleFactor) * res.rTotal;
+        }
+        const pEff = pTotal * throttleFactor;
+        const undervoltBonus = vcoreOffsetMv < 0 && tj < 88 ? Math.min(2.4, Math.abs(vcoreOffsetMv) * 0.016) : 0;
+        const clockEff = Math.min(102.5, Math.pow(throttleFactor, 0.42) * 100 + (throttleFactor >= 0.999 ? undervoltBonus : 0));
+
+        return { tj, pEff, clockEff, rTotal: res.rTotal };
+      }
+    };
+
+    // =========================================================================
+    // 7. DYNAMIC PERFORMANCE & EFFICIENCY RECOMMENDATION ENGINE
+    // =========================================================================
+    const RecommendationEngine = {
+      evaluate() {
+        const baseline = ThermalPhysicsEngine.predictSteadyState({});
+        const timShare = STATE.rTim / STATE.rTotal;
+        const convShare = STATE.rConv / STATE.rTotal;
+        const sinkShare = STATE.rSink / STATE.rTotal;
+
+        // Classify Primary Bottleneck Regime
+        let regime = {
+          label: 'BALANCED THERMAL EQUILIBRIUM',
+          badgeClass: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+          explanation: `Thermal stack is well-proportioned (R_θ,tot = ${STATE.rTotal.toFixed(3)} °C/W) with ${(CONFIG.TJ_MAX - STATE.tDie).toFixed(1)}°C headroom to TJMax. Heat flux (${STATE.qSinkToAir.toFixed(1)}W) is evacuating cleanly without clock throttling.`
+        };
+
+        if (STATE.tDie >= 90 || STATE.throttlePenalty > 0.5) {
+          if (STATE.vcoreOffsetMv >= 0 && STATE.tdp >= 150) {
+            regime = {
+              label: 'VOLTAGE / POWER-DENSITY LIMITED',
+              badgeClass: 'bg-red-500/15 border-red-500/40 text-red-400',
+              explanation: `Silicon die heat flux has reached ${STATE.heatDensityWcm2.toFixed(1)} W/cm² (${STATE.powerEffective.toFixed(0)}W), pushing T_j to ${STATE.tDie.toFixed(1)}°C and triggering a ${STATE.throttlePenalty.toFixed(1)}% boost clock penalty. Reducing V_core lowers heat quadratically (P ∝ V²).`
+            };
+          } else if (timShare > 0.14) {
+            regime = {
+              label: 'CONDUCTION / TIM-LIMITED',
+              badgeClass: 'bg-amber-500/15 border-amber-500/40 text-amber-400',
+              explanation: `The TIM bondline accounts for ${(timShare * 100).toFixed(0)}% (${STATE.rTim.toFixed(3)} °C/W) of total thermal impedance, creating a ΔT bottleneck of ${(STATE.tDie - STATE.tIhs).toFixed(1)}°C between die and IHS.`
+            };
+          } else {
+            regime = {
+              label: 'CONVECTION / AIRFLOW-LIMITED',
+              badgeClass: 'bg-red-500/15 border-red-500/40 text-red-400',
+              explanation: `Convective dissipation (${(convShare * 100).toFixed(0)}% of R_θ,tot) and heatsink capacity cannot evacuate ${STATE.powerRaw.toFixed(0)}W fast enough at ${STATE.ambientTemp}°C ambient, saturating thermal headroom.`
+            };
+          }
+        } else if (timShare > 0.16 && STATE.workload >= 50) {
+          regime = {
+            label: 'CONDUCTION / TIM-LIMITED',
+            badgeClass: 'bg-amber-500/15 border-amber-500/40 text-amber-400',
+            explanation: `Elevated bondline resistance (${STATE.rTim.toFixed(3)} °C/W) is impeding conductive heat flux into the copper IHS. Upgrading TIM material will directly drop junction temperatures.`
+          };
+        } else if ((convShare + sinkShare) > 0.72 && STATE.fanDuty < 75 && STATE.workload >= 60) {
+          regime = {
+            label: 'CONVECTION / AIRFLOW-LIMITED',
+            badgeClass: 'bg-amber-500/15 border-amber-500/40 text-amber-400',
+            explanation: `Convective boundary resistance (${STATE.rConv.toFixed(3)} °C/W) dominates ${(convShare * 100).toFixed(0)}% of thermal impedance due to conservative ${STATE.fanDuty}% fan duty cycle.`
+          };
+        } else if (STATE.eventLoopJitterMs > 4.0 || (STATE.syncTelemetry && STATE.liveEffectiveLoad > 80)) {
+          regime = {
+            label: 'OS / SCHEDULER WORKLOAD LIMITED',
+            badgeClass: 'bg-sky-500/15 border-sky-500/40 text-sky-400',
+            explanation: `High multi-core thread saturation (${STATE.workload}%) and ${STATE.eventLoopJitterMs.toFixed(1)}ms scheduling latency detected. Thread affinity pinning and background process throttling can stabilize frame times and lower average package power.`
+          };
+        }
+
+        // Build Ranked Quantified Optimization Cards across 3 engineering domains
+        const cards = [];
+
+        // 1. BIOS / Firmware Optimization Card
+        if (STATE.vcoreOffsetMv > -75) {
+          const targetVcore = Math.max(-120, STATE.vcoreOffsetMv - 75);
+          const sim = ThermalPhysicsEngine.predictSteadyState({ vcoreOffsetMv: targetVcore });
+          const dTemp = sim.tj - baseline.tj;
+          const dPower = sim.pEff - baseline.pEff;
+          const dClock = sim.clockEff - baseline.clockEff;
+
+          cards.push({
+            domain: 'BIOS / FIRMWARE TUNING',
+            domainColor: 'text-amber-300 bg-amber-500/10 border-amber-500/25',
+            title: `Apply ${targetVcore}mV Vcore Curve Optimizer Undervolt`,
+            rationale: `Dynamic switching power scales with V² (P = C·V²·f). Shifting V/F curve to ${targetVcore}mV cuts heat flux at the silicon source without sacrificing frequency.`,
+            badges: [
+              { text: `${dTemp <= 0 ? dTemp.toFixed(1) : '+' + dTemp.toFixed(1)}°C Junction`, positive: dTemp < -0.2 },
+              { text: `${dPower <= 0 ? dPower.toFixed(0) : '+' + dPower.toFixed(0)}W Package`, positive: dPower < -1 },
+              { text: `${dClock >= 0 ? '+' + dClock.toFixed(1) : dClock.toFixed(1)}% Eff. Clock`, positive: dClock > 0.1 }
+            ],
+            actionLabel: `Simulate ${targetVcore}mV Offset`,
+            applyFn: () => {
+              STATE.vcoreOffsetMv = targetVcore;
+              syncControlInputsFromState();
+              showToast(`Applied ${targetVcore}mV Vcore undervolt to thermal model`, 'success');
+            }
+          });
+        } else {
+          // If already heavily undervolted, recommend PL1/PL2 efficiency sweet-spot tuning
+          const targetTdp = Math.max(65, Math.round(STATE.tdp * 0.82 / 5) * 5);
+          const sim = ThermalPhysicsEngine.predictSteadyState({ tdp: targetTdp });
+          const dTemp = sim.tj - baseline.tj;
+          const dPower = sim.pEff - baseline.pEff;
+          cards.push({
+            domain: 'BIOS / FIRMWARE TUNING',
+            domainColor: 'text-amber-300 bg-amber-500/10 border-amber-500/25',
+            title: `Cap Sustained Package Power Limit (PL1) to ${targetTdp}W`,
+            rationale: `Eliminates diminishing-return voltage/frequency tail above ${targetTdp}W, maximizing performance-per-watt under sustained all-core renders.`,
+            badges: [
+              { text: `${dTemp.toFixed(1)}°C Junction`, positive: dTemp < -0.2 },
+              { text: `${dPower.toFixed(0)}W Package`, positive: dPower < -1 }
+            ],
+            actionLabel: `Simulate ${targetTdp}W PL1 Cap`,
+            applyFn: () => {
+              STATE.tdp = targetTdp;
+              syncControlInputsFromState();
+              showToast(`Set PL1/TDP cap to ${targetTdp}W`, 'success');
+            }
+          });
+        }
+
+        // 2. Physical Heat Transference Upgrade Card
+        if (STATE.timKey === 'standard' || STATE.timKey === 'enthusiast') {
+          const nextTim = STATE.timKey === 'standard' ? 'ptm7950' : 'liquid_metal';
+          const nextTimName = CONFIG.TIM_OPTIONS[nextTim].name;
+          const sim = ThermalPhysicsEngine.predictSteadyState({ timKey: nextTim });
+          const dTemp = sim.tj - baseline.tj;
+          const dClock = sim.clockEff - baseline.clockEff;
+
+          cards.push({
+            domain: 'PHYSICAL HEAT TRANSFERENCE',
+            domainColor: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/25',
+            title: `Upgrade TIM to ${nextTimName}`,
+            rationale: `Reduces conductive interface impedance R_θ,TIM from ${STATE.rTim.toFixed(3)} to ${(CONFIG.TIM_OPTIONS[nextTim].thicknessM / (CONFIG.TIM_OPTIONS[nextTim].k * CONFIG.IHS_AREA_M2)).toFixed(3)} °C/W across the IHS boundary.`,
+            badges: [
+              { text: `${dTemp.toFixed(1)}°C Junction`, positive: dTemp < -0.2 },
+              { text: `${dClock >= 0 ? '+' + dClock.toFixed(1) : dClock.toFixed(1)}% Sustained Clock`, positive: dClock > 0.1 }
+            ],
+            actionLabel: `Simulate ${nextTimName}`,
+            applyFn: () => {
+              STATE.timKey = nextTim;
+              syncControlInputsFromState();
+              showToast(`Switched TIM layer to ${nextTimName}`, 'success');
+            }
+          });
+        } else if (STATE.fanDuty < 85) {
+          const targetFan = Math.min(100, STATE.fanDuty + 20);
+          const sim = ThermalPhysicsEngine.predictSteadyState({ fanDuty: targetFan });
+          const dTemp = sim.tj - baseline.tj;
+          const dClock = sim.clockEff - baseline.clockEff;
+
+          cards.push({
+            domain: 'PHYSICAL HEAT TRANSFERENCE',
+            domainColor: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/25',
+            title: `Optimize Fan / Pump PWM Curve to ${targetFan}%`,
+            rationale: `Increases static airflow across fin stack, raising convective heat transfer coefficient h(RPM) and dropping T_s sink temperature.`,
+            badges: [
+              { text: `${dTemp.toFixed(1)}°C Junction`, positive: dTemp < -0.2 },
+              { text: `${dClock >= 0 ? '+' + dClock.toFixed(1) : dClock.toFixed(1)}% Sustained Clock`, positive: dClock > 0.1 }
+            ],
+            actionLabel: `Set Fan Curve to ${targetFan}%`,
+            applyFn: () => {
+              STATE.fanDuty = targetFan;
+              syncControlInputsFromState();
+              showToast(`Adjusted Fan/Pump PWM duty cycle to ${targetFan}%`, 'success');
+            }
+          });
+        } else {
+          const targetCooler = STATE.coolerKey === 'low_profile' ? 'dual_tower' : 'custom_360';
+          const coolerName = CONFIG.COOLER_OPTIONS[targetCooler].name;
+          const sim = ThermalPhysicsEngine.predictSteadyState({ coolerKey: targetCooler });
+          const dTemp = sim.tj - baseline.tj;
+          cards.push({
+            domain: 'PHYSICAL HEAT TRANSFERENCE',
+            domainColor: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/25',
+            title: `Upgrade Radiator / Fin Surface (${coolerName})`,
+            rationale: `Expands convective dissipation surface area A_surface and thermal capacitance C_th to absorb sustained high-wattage workloads.`,
+            badges: [
+              { text: `${dTemp.toFixed(1)}°C Junction`, positive: dTemp < -0.2 },
+              { text: `-${((baseline.rTotal - sim.rTotal) * 1000).toFixed(0)} m°C/W R_θ`, positive: true }
+            ],
+            actionLabel: `Simulate ${coolerName}`,
+            applyFn: () => {
+              STATE.coolerKey = targetCooler;
+              syncControlInputsFromState();
+              showToast(`Upgraded cooling architecture to ${coolerName}`, 'success');
+            }
+          });
+        }
+
+        // 3. OS & Workload Scheduler Optimization Card
+        const targetWorkload = Math.max(15, Math.round(STATE.workload * 0.78));
+        const simOs = ThermalPhysicsEngine.predictSteadyState({ workload: targetWorkload });
+        const dTempOs = simOs.tj - baseline.tj;
+        const dPowerOs = simOs.pEff - baseline.pEff;
+
+        cards.push({
+          domain: 'OS & WORKLOAD SCHEDULER',
+          domainColor: 'text-sky-300 bg-sky-500/10 border-sky-500/25',
+          title: STATE.stressIntensity > 0
+            ? `Throttle Background Worker Threads (${Math.max(1, Math.floor(STATE.workerThreads / 2))} Threads)`
+            : `Pin Foreground Affinity & Park Idle C-States`,
+          rationale: STATE.stressIntensity > 0
+            ? `Constraining background worker pools reduces multi-core contention and event-loop jitter (${STATE.eventLoopJitterMs.toFixed(1)}ms) while preserving UI responsiveness.`
+            : `Isolating background telemetry tasks to efficiency cores prevents spurious single-core voltage spikes and lowers average package residency.`,
+          badges: [
+            { text: `${dTempOs.toFixed(1)}°C Junction`, positive: dTempOs < -0.2 },
+            { text: `${dPowerOs.toFixed(0)}W Avg Power`, positive: dPowerOs < -1 },
+            { text: `-45% Jitter`, positive: true }
+          ],
+          actionLabel: STATE.stressIntensity > 0 ? 'Optimize Worker Pool' : 'Simulate Core Parking',
+          applyFn: () => {
+            if (STATE.stressIntensity > 0) {
+              STATE.workerThreads = Math.max(1, Math.floor(STATE.workerThreads / 2));
+              STATE.stressIntensity = Math.max(0, Math.round(STATE.stressIntensity * 0.65));
+              WorkerStressEngine.setIntensity(STATE.stressIntensity);
+              syncControlInputsFromState();
+              showToast(`Optimized Web Worker pool to ${STATE.workerThreads} threads @ ${STATE.stressIntensity}%`, 'success');
+            } else {
+              STATE.workload = targetWorkload;
+              syncControlInputsFromState();
+              showToast(`Simulated OS background core parking (${targetWorkload}% load)`, 'success');
+            }
+          }
+        });
+
+        this.render(regime, cards);
+      },
+
+      render(regime, cards) {
+        const banner = document.getElementById('bottleneckBanner');
+        const label = document.getElementById('bottleneckLabel');
+        const expl = document.getElementById('bottleneckExplanation');
+        const grid = document.getElementById('recommendationsGrid');
+
+        banner.className = `flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-mono ${regime.badgeClass}`;
+        label.textContent = regime.label;
+        expl.textContent = regime.explanation;
+
+        grid.innerHTML = '';
+        cards.forEach((card) => {
+          const el = document.createElement('div');
+          el.className = 'glass-subcard p-4 flex flex-col justify-between gap-3 hover:border-sky-500/35 transition';
+
+          const badgesHtml = card.badges.map(b => {
+            const cls = b.positive
+              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+              : 'bg-slate-800 text-slate-300 border-slate-700';
+            return `<span class="text-[11px] font-mono px-2 py-0.5 rounded-md border ${cls}">${b.text}</span>`;
+          }).join('');
+
+          el.innerHTML = `
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${card.domainColor}">
+                  ${card.domain}
+                </span>
+              </div>
+              <h3 class="text-sm font-semibold text-slate-100 leading-snug">${card.title}</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">${card.rationale}</p>
+              <div class="flex flex-wrap gap-1.5 pt-1">${badgesHtml}</div>
+            </div>
+            <button type="button"
+              class="w-full py-2 px-3 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/35 text-xs font-mono font-semibold text-sky-300 transition cursor-pointer flex items-center justify-center gap-1.5">
+              <span>⚡ ${card.actionLabel}</span>
+            </button>
+          `;
+
+          el.querySelector('button').addEventListener('click', card.applyFn);
+          grid.appendChild(el);
+        });
+      }
+    };
+
+    // =========================================================================
+    // 8. ANIMATED SVG HEAT TRANSFERENCE SCHEMATIC RENDERER
+    // =========================================================================
+    const SchematicRenderer = {
+      particles: [],
+      svgGroup: null,
+      maxParticles: 48,
+
+      init() {
+        this.svgGroup = document.getElementById('heatParticlesGroup');
+        for (let i = 0; i < this.maxParticles; i++) {
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('r', '2.6');
+          circle.setAttribute('opacity', '0');
+          this.svgGroup.appendChild(circle);
+
+          this.particles.push({
+            el: circle,
+            x: 165 + Math.random() * 160,
+            y: 220 + Math.random() * 45,
+            vx: (Math.random() - 0.5) * 0.4,
+            phase: Math.random() * Math.PI * 2,
+            active: false
+          });
+        }
+
+        // Layer click selection
+        document.querySelectorAll('.layer-group').forEach(group => {
+          group.addEventListener('click', () => {
+            STATE.selectedLayer = group.getAttribute('data-layer');
+            this.updateLayerInspector();
+          });
+        });
+      },
+
+      tempToHex(temp) {
+        if (temp < 45) return '#10b981';      // Emerald
+        if (temp < 68) return '#38bdf8';      // Cyan
+        if (temp < 85) return '#f59e0b';      // Amber
+        return '#ef4444';                     // Thermal Crimson
+      },
+
+      updateLayerInspector() {
+        const info = CONFIG.LAYER_INFO[STATE.selectedLayer] || CONFIG.LAYER_INFO.tim;
+        document.getElementById('inspectorTitle').textContent = info.title;
+        document.getElementById('inspectorDesc').textContent = info.desc;
+
+        let deltaStr = '';
+        if (STATE.selectedLayer === 'die') {
+          deltaStr = `T_j: ${STATE.tDie.toFixed(1)}°C`;
+        } else if (STATE.selectedLayer === 'tim') {
+          const dtTim = STATE.qDieToIhs * STATE.rTim;
+          deltaStr = `ΔT: ${dtTim.toFixed(1)}°C`;
+        } else if (STATE.selectedLayer === 'ihs') {
+          deltaStr = `T_c: ${STATE.tIhs.toFixed(1)}°C`;
+        } else if (STATE.selectedLayer === 'heatsink') {
+          deltaStr = `T_s: ${STATE.tSink.toFixed(1)}°C`;
+        } else if (STATE.selectedLayer === 'convection') {
+          deltaStr = `ΔT_conv: ${(STATE.tSink - STATE.ambientTemp).toFixed(1)}°C`;
+        }
+        document.getElementById('inspectorDelta').textContent = deltaStr;
+      },
+
+      update(dt) {
+        // Update SVG thermal color stops
+        const cDie = this.tempToHex(STATE.tDie);
+        const cIhs = this.tempToHex(STATE.tIhs);
+        const cSink = this.tempToHex(STATE.tSink);
+
+        document.getElementById('stopDieBottom').setAttribute('stop-color', cDie);
+        document.getElementById('stopDieTop').setAttribute('stop-color', cDie);
+        document.getElementById('stopIhsBottom').setAttribute('stop-color', cIhs);
+        document.getElementById('stopIhsTop').setAttribute('stop-color', cSink);
+        document.getElementById('stopSinkBottom').setAttribute('stop-color', cSink);
+
+        // Update SVG Callout Texts
+        const timObj = CONFIG.TIM_OPTIONS[STATE.timKey];
+        document.getElementById('svgTimLabel').textContent = `2. TIM: ${timObj.name.toUpperCase()} (${timObj.k} W/m·K)`;
+        document.getElementById('svgAirSub').textContent = `Fan ${STATE.fanDuty}% | Exhaust: ${STATE.tExhaust.toFixed(1)}°C (Amb ${STATE.ambientTemp}°C)`;
+
+        document.getElementById('svgCalloutAir').textContent = `${STATE.tExhaust.toFixed(1)}°C (Δ +${(STATE.tExhaust - STATE.ambientTemp).toFixed(1)}°)`;
+        document.getElementById('svgCalloutSink').textContent = `${STATE.tSink.toFixed(1)}°C | R:${STATE.rSink.toFixed(3)}`;
+        document.getElementById('svgCalloutIhs').textContent = `${STATE.tIhs.toFixed(1)}°C | R:${STATE.rConv.toFixed(3)}`;
+
+        const dtTim = Math.max(0, STATE.qDieToIhs * STATE.rTim);
+        const timPct = Math.round((STATE.rTim / STATE.rTotal) * 100);
+        document.getElementById('svgCalloutTim').textContent = `TIM ΔT: ${dtTim.toFixed(1)}°C (${timPct}%)`;
+
+        const dieCallout = document.getElementById('svgCalloutDie');
+        dieCallout.textContent = `${STATE.tDie.toFixed(1)}°C | Q: ${STATE.powerEffective.toFixed(0)}W`;
+        dieCallout.setAttribute('fill', cDie);
+
+        // Update Right-Side Resistance Breakdown Bars
+        const diePct = Math.round((STATE.rDieIhs / STATE.rTotal) * 100);
+        const sinkPct = Math.round((STATE.rSink / STATE.rTotal) * 100);
+        const convPct = Math.max(0, 100 - diePct - timPct - sinkPct);
+
+        document.getElementById('resDieShare').textContent = `${STATE.rDieIhs.toFixed(3)} (${diePct}%)`;
+        document.getElementById('barDieShare').style.width = `${diePct}%`;
+
+        document.getElementById('resTimShare').textContent = `${STATE.rTim.toFixed(3)} (${timPct}%)`;
+        document.getElementById('barTimShare').style.width = `${timPct}%`;
+
+        document.getElementById('resSinkShare').textContent = `${STATE.rSink.toFixed(3)} (${sinkPct}%)`;
+        document.getElementById('barSinkShare').style.width = `${sinkPct}%`;
+
+        document.getElementById('resConvShare').textContent = `${STATE.rConv.toFixed(3)} (${convPct}%)`;
+        document.getElementById('barConvShare').style.width = `${convPct}%`;
+
+        this.updateLayerInspector();
+
+        // Animate Heat Flux Particles rising from Die -> TIM -> IHS -> Sink -> Airflow
+        const activeCount = Math.min(this.maxParticles, Math.max(6, Math.round((STATE.powerEffective / 250) * this.maxParticles)));
+        const baseSpeed = 28 + (STATE.powerEffective / 250) * 95; // px/sec
+
+        for (let i = 0; i < this.maxParticles; i++) {
+          const p = this.particles[i];
+          if (i >= activeCount) {
+            p.el.setAttribute('opacity', '0');
+            continue;
+          }
+
+          // Slow particle velocity slightly inside high-resistance TIM layer to visualize thermal impedance!
+          let layerSpeedMult = 1.0;
+          if (p.y >= 194 && p.y <= 218) {
+            layerSpeedMult = Math.max(0.35, 1.0 - (STATE.rTim * 6.5));
+          } else if (p.y < 70) {
+            // Swept sideways by convective airflow!
+            p.x += (45 + STATE.fanDuty * 1.3) * dt;
+            layerSpeedMult = 0.65;
+          }
+
+          p.y -= baseSpeed * layerSpeedMult * dt;
+          p.x += Math.sin(p.phase + p.y * 0.05) * 12 * dt;
+
+          // Respawn at silicon die when exiting top or right edge
+          if (p.y < 16 || p.x > 415) {
+            p.y = 248 + Math.random() * 20;
+            p.x = 160 + Math.random() * 170;
+          }
+
+          // Color particle according to vertical thermal gradient
+          let pColor = cDie;
+          if (p.y < 70) pColor = '#38bdf8';
+          else if (p.y < 138) pColor = cSink;
+          else if (p.y < 195) pColor = cIhs;
+
+          p.el.setAttribute('cx', p.x.toFixed(1));
+          p.el.setAttribute('cy', p.y.toFixed(1));
+          p.el.setAttribute('fill', pColor);
+          p.el.setAttribute('opacity', p.y < 24 ? '0.35' : '0.85');
+        }
+      }
+    };
+
+    // =========================================================================
+    // 9. 60-SECOND ROLLING HTML5 CANVAS TELEMETRY CHART
+    // =========================================================================
+    const ChartRenderer = {
+      canvas: null,
+      ctx: null,
+      hoverX: null,
+
+      init() {
+        this.canvas = document.getElementById('telemetryChartCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        const container = document.getElementById('chartContainer');
+        const tooltip = document.getElementById('chartTooltip');
+
+        const resizeObserver = new ResizeObserver(() => this.resize());
+        resizeObserver.observe(container);
+        this.resize();
+
+        // Pointer hover inspection
+        this.canvas.addEventListener('mousemove', (e) => {
+          const rect = this.canvas.getBoundingClientRect();
+          this.hoverX = e.clientX - rect.left;
+        });
+        this.canvas.addEventListener('mouseleave', () => {
+          this.hoverX = null;
+          tooltip.classList.add('hidden');
+        });
+        this.canvas.addEventListener('touchmove', (e) => {
+          if (e.touches.length > 0) {
+            const rect = this.canvas.getBoundingClientRect();
+            this.hoverX = e.touches[0].clientX - rect.left;
+          }
+        }, { passive: true });
+        this.canvas.addEventListener('touchend', () => {
+          this.hoverX = null;
+          tooltip.classList.add('hidden');
+        });
+      },
+
+      resize() {
+        if (!this.canvas) return;
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = Math.max(10, Math.floor(rect.width * dpr));
+        this.canvas.height = Math.max(10, Math.floor(rect.height * dpr));
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.draw();
+      },
+
+      draw() {
+        if (!this.ctx) return;
+        const width = this.canvas.width / (window.devicePixelRatio || 1);
+        const height = this.canvas.height / (window.devicePixelRatio || 1);
+        const ctx = this.ctx;
+
+        ctx.clearRect(0, 0, width, height);
+
+        const padLeft = 42;
+        const padRight = 44;
+        const padTop = 18;
+        const padBottom = 26;
+        const plotW = Math.max(10, width - padLeft - padRight);
+        const plotH = Math.max(10, height - padTop - padBottom);
+
+        // Draw Horizontal Gridlines & Left Axis (Temp 0 - 110°C / Clock %) & Right Axis (Power 0 - 260W)
+        ctx.font = '10px "JetBrains Mono", monospace';
+        ctx.textBaseline = 'middle';
+
+        const gridSteps = [0, 25, 50, 75, 100];
+        gridSteps.forEach(val => {
+          const y = padTop + plotH - (val / 110) * plotH;
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.09)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(padLeft, y);
+          ctx.lineTo(padLeft + plotW, y);
+          ctx.stroke();
+
+          // Left labels (°C / %)
+          ctx.fillStyle = '#64748b';
+          ctx.textAlign = 'right';
+          ctx.fillText(`${val}°`, padLeft - 6, y);
+
+          // Right labels (Watts scaled to 275W max)
+          const wattVal = Math.round((val / 110) * 275);
+          ctx.textAlign = 'left';
+          ctx.fillText(`${wattVal}W`, padLeft + plotW + 6, y);
+        });
+
+        // TJMax 100°C Danger Reference Line
+        const yTjMax = padTop + plotH - (100 / 110) * plotH;
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(padLeft, yTjMax);
+        ctx.lineTo(padLeft + plotW, yTjMax);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#f87171';
+        ctx.textAlign = 'left';
+        ctx.fillText('TJMax 100°C', padLeft + 6, yTjMax - 8);
+
+        // X-axis time labels
+        ctx.fillStyle = '#64748b';
+        ctx.textAlign = 'center';
+        ctx.fillText('-60s', padLeft, height - 10);
+        ctx.fillText('-30s', padLeft + plotW * 0.5, height - 10);
+        ctx.fillText('LIVE', padLeft + plotW, height - 10);
+
+        const data = STATE.history;
+        if (data.length < 2) return;
+
+        const maxPoints = 120; // 60s at 2Hz
+        const startIdx = Math.max(0, data.length - maxPoints);
+        const visible = data.slice(startIdx);
+
+        const plotSeries = (accessor, maxScale, color, lineWidth = 2, fillAlpha = 0) => {
+          ctx.beginPath();
+          visible.forEach((pt, idx) => {
+            const xRatio = (idx + (maxPoints - visible.length)) / (maxPoints - 1);
+            const x = padLeft + xRatio * plotW;
+            const val = accessor(pt);
+            const y = padTop + plotH - Math.min(1, Math.max(0, val / maxScale)) * plotH;
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lineWidth;
+          ctx.stroke();
+
+          if (fillAlpha > 0) {
+            const lastX = padLeft + plotW;
+            const firstX = padLeft + ((maxPoints - visible.length) / (maxPoints - 1)) * plotW;
+            ctx.lineTo(lastX, padTop + plotH);
+            ctx.lineTo(firstX, padTop + plotH);
+            ctx.closePath();
+            ctx.fillStyle = color.replace('1)', `${fillAlpha})`);
+            ctx.fill();
+          }
+        };
+
+        // Plot 4 telemetry traces
+        plotSeries(p => p.clockEff, 110, 'rgba(16, 185, 129, 0.85)', 1.6, 0);
+        plotSeries(p => p.power, 275, 'rgba(56, 189, 248, 0.9)', 1.8, 0);
+        plotSeries(p => p.tc, 110, 'rgba(245, 158, 11, 0.9)', 1.8, 0);
+        plotSeries(p => p.tj, 110, 'rgba(244, 63, 94, 1)', 2.4, 0.12);
+
+        // Hover Crosshair & Tooltip
+        const tooltip = document.getElementById('chartTooltip');
+        if (this.hoverX !== null && this.hoverX >= padLeft && this.hoverX <= padLeft + plotW) {
+          const ratio = (this.hoverX - padLeft) / plotW;
+          const virtualIdx = Math.round(ratio * (maxPoints - 1));
+          const dataIdx = virtualIdx - (maxPoints - visible.length);
+
+          if (dataIdx >= 0 && dataIdx < visible.length) {
+            const pt = visible[dataIdx];
+            ctx.strokeStyle = 'rgba(226, 232, 240, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(this.hoverX, padTop);
+            ctx.lineTo(this.hoverX, padTop + plotH);
+            ctx.stroke();
+
+            const secAgo = Math.round((1 - ratio) * 60);
+            tooltip.classList.remove('hidden');
+            tooltip.innerHTML = `
+              <div class="text-slate-400 mb-0.5">T-${secAgo}s Telemetry</div>
+              <div class="flex gap-3">
+                <span class="text-rose-400">Tj: ${pt.tj.toFixed(1)}°C</span>
+                <span class="text-amber-400">Tc: ${pt.tc.toFixed(1)}°C</span>
+                <span class="text-sky-400">P: ${pt.power.toFixed(0)}W</span>
+                <span class="text-emerald-400">Eff: ${pt.clockEff.toFixed(1)}%</span>
+              </div>
+            `;
+          }
+        }
+      }
+    };
+
+    // =========================================================================
+    // 10. UI SYNCHRONIZATION & EVENT HANDLERS
+    // =========================================================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const styles = {
+        success: 'bg-slate-900/95 border-emerald-500/45 text-emerald-300',
+        error: 'bg-slate-900/95 border-red-500/45 text-red-300',
+        info: 'bg-slate-900/95 border-sky-500/45 text-sky-300'
+      };
+      toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl border backdrop-blur-md text-xs font-mono shadow-xl transition-all duration-300 ${styles[type] || styles.info}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    function syncControlInputsFromState() {
+      document.getElementById('workloadSlider').value = STATE.workload;
+      document.getElementById('workloadVal').textContent = `${STATE.workload}%`;
+
+      document.getElementById('tdpSlider').value = STATE.tdp;
+      document.getElementById('tdpVal').textContent = `${STATE.tdp} W`;
+
+      document.getElementById('vcoreSlider').value = STATE.vcoreOffsetMv;
+      const vSign = STATE.vcoreOffsetMv > 0 ? '+' : '';
+      document.getElementById('vcoreVal').textContent = `${vSign}${STATE.vcoreOffsetMv} mV`;
+
+      document.getElementById('timSelect').value = STATE.timKey;
+      document.getElementById('coolerSelect').value = STATE.coolerKey;
+
+      document.getElementById('fanSlider').value = STATE.fanDuty;
+      document.getElementById('fanVal').textContent = `${STATE.fanDuty}%`;
+
+      document.getElementById('ambientSlider').value = STATE.ambientTemp;
+      document.getElementById('ambientVal').textContent = `${STATE.ambientTemp} °C`;
+
+      document.getElementById('workerThreadsSlider').value = STATE.workerThreads;
+      document.getElementById('workerThreadsVal').textContent = `${STATE.workerThreads} / ${STATE.logicalCores} Threads`;
+
+      document.getElementById('stressIntensitySlider').value = STATE.stressIntensity;
+      document.getElementById('stressIntensityVal').textContent = STATE.stressIntensity === 0
+        ? '0% (Idle)'
+        : `${STATE.stressIntensity}% Active`;
+    }
+
+    function updateTelemetryDOM() {
+      // KPI 1: Junction Temperature & Status
+      const kpiTj = document.getElementById('kpiTj');
+      const kpiStatus = document.getElementById('kpiThermalStatus');
+      const headroom = CONFIG.TJ_MAX - STATE.tDie;
+
+      kpiTj.textContent = STATE.tDie.toFixed(1);
+      document.getElementById('kpiHeadroom').textContent = `${headroom >= 0 ? '+' : ''}${headroom.toFixed(1)} °C`;
+      document.getElementById('kpiTjBar').style.width = `${Math.min(100, Math.max(0, STATE.tDie))}%`;
+
+      if (STATE.tDie >= 92) {
+        kpiTj.className = 'font-mono text-3xl font-bold text-red-400 tabular-nums';
+        kpiStatus.textContent = 'THROTTLING';
+        kpiStatus.className = 'ml-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40';
+      } else if (STATE.tDie >= 78) {
+        kpiTj.className = 'font-mono text-3xl font-bold text-amber-400 tabular-nums';
+        kpiStatus.textContent = 'ELEVATED';
+        kpiStatus.className = 'ml-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
+      } else {
+        kpiTj.className = 'font-mono text-3xl font-bold text-emerald-400 tabular-nums';
+        kpiStatus.textContent = 'OPTIMAL';
+        kpiStatus.className = 'ml-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+      }
+
+      // KPI 2: Package Power & Voltage
+      document.getElementById('kpiPower').textContent = STATE.powerEffective.toFixed(1);
+      document.getElementById('kpiPowerLimitPct').textContent = `/ ${STATE.tdp}W TDP`;
+      document.getElementById('kpiVcore').textContent = `${STATE.vcoreActual.toFixed(3)} V`;
+      document.getElementById('kpiHeatDensity').textContent = `${STATE.heatDensityWcm2.toFixed(1)} W/cm²`;
+
+      // KPI 3: Total Resistance & Flux
+      document.getElementById('kpiRtotal').textContent = STATE.rTotal.toFixed(3);
+      document.getElementById('kpiQconv').textContent = `${STATE.qSinkToAir.toFixed(1)} W`;
+      document.getElementById('kpiTout').textContent = `${STATE.tExhaust.toFixed(1)} °C`;
+      document.getElementById('schematicRtot').textContent = `${STATE.rTotal.toFixed(3)} °C/W`;
+      document.getElementById('schematicDeltaT').textContent = `+${(STATE.tDie - STATE.ambientTemp).toFixed(1)} °C`;
+
+      // KPI 4: Clock Efficiency & Jitter
+      const kpiClockEff = document.getElementById('kpiClockEff');
+      const kpiPenalty = document.getElementById('kpiThrottlePenalty');
+      kpiClockEff.textContent = STATE.clockEfficiency.toFixed(1);
+      kpiClockEff.className = STATE.throttlePenalty > 0.5
+        ? 'font-mono text-3xl font-bold text-amber-400 tabular-nums'
+        : 'font-mono text-3xl font-bold text-emerald-400 tabular-nums';
+
+      document.getElementById('kpiEstClock').textContent = `${STATE.estClockGhz.toFixed(2)} GHz`;
+      kpiPenalty.textContent = `${STATE.throttlePenalty > 0 ? '-' : ''}${STATE.throttlePenalty.toFixed(1)} %`;
+      kpiPenalty.className = STATE.throttlePenalty > 0.5
+        ? 'text-red-400 font-semibold tabular-nums'
+        : 'text-emerald-400 font-semibold tabular-nums';
+
+      const jitterText = `${STATE.eventLoopJitterMs.toFixed(1)} ms`;
+      document.getElementById('kpiJitter').textContent = jitterText;
+      document.getElementById('liveJitterStat').textContent = jitterText;
+      document.getElementById('liveEffectiveLoad').textContent = `${STATE.liveEffectiveLoad.toFixed(1)}%`;
+      document.getElementById('liveWorkerOps').textContent = `${STATE.workerOpsPerSec.toFixed(1)} M/s`;
+    }
+
+    function bindEventListeners() {
+      // Hardware Sliders
+      document.getElementById('workloadSlider').addEventListener('input', (e) => {
+        STATE.workload = Number(e.target.value);
+        document.getElementById('workloadVal').textContent = `${STATE.workload}%`;
+        document.getElementById('presetSelector').value = 'custom';
+      });
+
+      document.getElementById('tdpSlider').addEventListener('input', (e) => {
+        STATE.tdp = Number(e.target.value);
+        document.getElementById('tdpVal').textContent = `${STATE.tdp} W`;
+        document.getElementById('presetSelector').value = 'custom';
+      });
+
+      document.getElementById('vcoreSlider').addEventListener('input', (e) => {
+        STATE.vcoreOffsetMv = Number(e.target.value);
+        const sign = STATE.vcoreOffsetMv > 0 ? '+' : '';
+        document.getElementById('vcoreVal').textContent = `${sign}${STATE.vcoreOffsetMv} mV`;
+        document.getElementById('presetSelector').value = 'custom';
+      });
+
+      document.getElementById('timSelect').addEventListener('change', (e) => {
+        STATE.timKey = e.target.value;
+        document.getElementById('presetSelector').value = 'custom';
+      });
+
+      document.getElementById('coolerSelect').addEventListener('change', (e) => {
+        STATE.coolerKey = e.target.value;
+        document.getElementById('presetSelector').value = 'custom';
+      });
+
+      document.getElementById('fanSlider').addEventListener('input', (e) => {
+        STATE.fanDuty = Number(e.target.value);
+        document.getElementById('fanVal').textContent = `${STATE.fanDuty}%`;
+        document.getElementById('presetSelector').value = 'custom';
+      });
+
+      document.getElementById('ambientSlider').addEventListener('input', (e) => {
+        STATE.ambientTemp = Number(e.target.value);
+        document.getElementById('ambientVal').textContent = `${STATE.ambientTemp} °C`;
+        document.getElementById('presetSelector').value = 'custom';
+      });
+
+      // Scenario Presets
+      document.getElementById('presetSelector').addEventListener('change', (e) => {
+        const preset = CONFIG.PRESETS[e.target.value];
+        if (!preset) return;
+        if (STATE.syncTelemetry) {
+          STATE.syncTelemetry = false;
+          document.getElementById('syncTelemetryToggle').checked = false;
+          document.getElementById('workloadSlider').disabled = false;
+          document.getElementById('workloadSyncTag').classList.add('hidden');
+        }
+        Object.assign(STATE, preset);
+        syncControlInputsFromState();
+        RecommendationEngine.evaluate();
+        showToast(`Loaded preset: ${e.target.options[e.target.selectedIndex].text}`, 'info');
+      });
+
+      // Sync Telemetry Toggle
+      document.getElementById('syncTelemetryToggle').addEventListener('change', (e) => {
+        STATE.syncTelemetry = e.target.checked;
+        const slider = document.getElementById('workloadSlider');
+        const tag = document.getElementById('workloadSyncTag');
+        slider.disabled = STATE.syncTelemetry;
+        if (STATE.syncTelemetry) {
+          tag.classList.remove('hidden');
+          showToast('Live Telemetry Sync enabled: CPU workload driven by Web Workers', 'success');
+        } else {
+          tag.classList.add('hidden');
+          showToast('Live Telemetry Sync disabled: Manual workload slider active', 'info');
+        }
+      });
+
+      // Web Worker Controls
+      const threadSlider = document.getElementById('workerThreadsSlider');
+      threadSlider.max = Math.max(2, STATE.logicalCores);
+      threadSlider.value = STATE.workerThreads;
+      document.getElementById('workerThreadsVal').textContent = `${STATE.workerThreads} / ${STATE.logicalCores} Threads`;
+
+      threadSlider.addEventListener('input', (e) => {
+        STATE.workerThreads = Number(e.target.value);
+        document.getElementById('workerThreadsVal').textContent = `${STATE.workerThreads} / ${STATE.logicalCores} Threads`;
+        WorkerStressEngine.syncPoolSize(STATE.workerThreads);
+      });
+
+      document.getElementById('stressIntensitySlider').addEventListener('input', (e) => {
+        const val = Number(e.target.value);
+        WorkerStressEngine.setIntensity(val);
+        document.getElementById('stressIntensityVal').textContent = val === 0 ? '0% (Idle)' : `${val}% Active`;
+      });
+
+      const quickStress = (val) => {
+        WorkerStressEngine.setIntensity(val);
+        document.getElementById('stressIntensitySlider').value = val;
+        document.getElementById('stressIntensityVal').textContent = val === 0 ? '0% (Idle)' : `${val}% Active`;
+        if (val > 0 && !STATE.syncTelemetry) {
+          STATE.syncTelemetry = true;
+          document.getElementById('syncTelemetryToggle').checked = true;
+          document.getElementById('workloadSlider').disabled = true;
+          document.getElementById('workloadSyncTag').classList.remove('hidden');
+          showToast(`Started ${val}% multi-core stress test & auto-synced thermal model`, 'success');
+        }
+      };
+
+      document.getElementById('stressStopBtn').addEventListener('click', () => quickStress(0));
+      document.getElementById('stressBurstBtn').addEventListener('click', () => quickStress(50));
+      document.getElementById('stressMaxBtn').addEventListener('click', () => quickStress(100));
+
+      // Sensor Log Importer
+      document.getElementById('loadSampleCsvBtn').addEventListener('click', () => {
+        LogImporter.loadSampleTrace();
+      });
+
+      document.getElementById('stopLogPlaybackBtn').addEventListener('click', () => {
+        LogImporter.stop();
+      });
+
+      document.getElementById('sensorFileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            LogImporter.parseText(ev.target.result, file.name);
+          } catch (err) {
+            showToast(`Import error: ${err.message}`, 'error');
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      });
+
+      // Sandbox Modal Controls
+      const modal = document.getElementById('sandboxModal');
+      document.getElementById('openSandboxModalBtn').addEventListener('click', () => modal.classList.remove('hidden'));
+      document.getElementById('closeSandboxModalBtn').addEventListener('click', () => modal.classList.add('hidden'));
+      document.getElementById('ackSandboxModalBtn').addEventListener('click', () => modal.classList.add('hidden'));
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+      });
+    }
+
+    // =========================================================================
+    // 11. MAIN SIMULATION & TELEMETRY LOOP (STARTED ON WINDOW LOAD)
+    // =========================================================================
+    let lastSimTimestamp = performance.now();
+
+    function mainLoop(now) {
+      const dt = Math.min(0.1, (now - lastSimTimestamp) / 1000);
+      lastSimTimestamp = now;
+
+      // Update Web Worker ops & host load metrics
+      WorkerStressEngine.updateMetrics();
+      if (!STATE.pressureSupported) {
+        updatePressureBadgeUI();
+      }
+
+      // Advance thermal physics ODE
+      ThermalPhysicsEngine.step(dt);
+
+      // Update animated SVG schematic & DOM readouts
+      SchematicRenderer.update(dt);
+      updateTelemetryDOM();
+
+      // Sample rolling 60s history & step CSV log playback every 500ms
+      if (now - STATE.lastChartSampleTime >= 500) {
+        STATE.lastChartSampleTime = now;
+
+        if (STATE.importedLog) {
+          LogImporter.stepPlayback();
+        }
+
+        STATE.history.push({
+          tj: STATE.tDie,
+          tc: STATE.tIhs,
+          power: STATE.powerEffective,
+          clockEff: STATE.clockEfficiency
+        });
+        if (STATE.history.length > 120) {
+          STATE.history.shift();
+        }
+        ChartRenderer.draw();
+      }
+
+      // Re-evaluate dynamic performance recommendations every 1.2s
+      if (now - STATE.lastRecUpdateTime >= 1200) {
+        STATE.lastRecUpdateTime = now;
+        RecommendationEngine.evaluate();
+      }
+
+      requestAnimationFrame(mainLoop);
+    }
+
+    window.addEventListener('load', () => {
+      // Display detected logical cores
+      document.getElementById('headerCoreCount').textContent = `${STATE.logicalCores} LOGICAL`;
+
+      // Pre-populate initial 60s baseline history so oscilloscope is immediately rich
+      ThermalPhysicsEngine.step(0.05);
+      for (let i = 0; i < 40; i++) {
+        STATE.history.push({
+          tj: STATE.tDie,
+          tc: STATE.tIhs,
+          power: STATE.powerEffective,
+          clockEff: STATE.clockEfficiency
+        });
+      }
+
+      // Initialize subsystems
+      bindEventListeners();
+      syncControlInputsFromState();
+      SchematicRenderer.init();
+      ChartRenderer.init();
+      initComputePressure();
+      RecommendationEngine.evaluate();
+
+      // Start event-loop jitter monitor and main telemetry loop
+      requestAnimationFrame(measureEventLoopJitter);
+      lastSimTimestamp = performance.now();
+      requestAnimationFrame(mainLoop);
+    });
+
+    // Clean up background workers on page unload
+    window.addEventListener('beforeunload', () => {
+      WorkerStressEngine.syncPoolSize(0);
+    });
+  </script>
+</body>
+</html>
